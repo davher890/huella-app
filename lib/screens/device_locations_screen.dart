@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
@@ -5,6 +7,11 @@ import 'package:latlong2/latlong.dart' as ll;
 import '../api/api_client.dart';
 import '../models/device.dart';
 import '../models/location_point.dart';
+import '../models/time_range_filter.dart';
+import 'create_zone_screen.dart';
+
+const _realtimeChoice = 'realtime';
+const _staleThreshold = Duration(minutes: 2);
 
 class DeviceLocationsScreen extends StatefulWidget {
   const DeviceLocationsScreen({super.key, required this.device});
@@ -18,18 +25,234 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
   final _apiClient = ApiClient();
   late Future<List<LocationPoint>> _locationsFuture;
   bool _showList = false;
+  TimeRangeFilter _filter = const TimeRangeFilter.preset(TimeRangePreset.last6h);
+
+  bool _isRealtime = true;
+  Timer? _realtimeTimer;
+  LocationPoint? _latestLocation;
+  bool _realtimeLoading = true;
+  String? _realtimeError;
+
+  List<ll.LatLng>? _zonePoints;
 
   @override
   void initState() {
     super.initState();
-    _locationsFuture = _apiClient.fetchLocations(widget.device.id);
+    // Por defecto se abre en modo tiempo real; _locationsFuture se rellena
+    // solo si el usuario cambia a un rango historico (ver _openFilterMenu).
+    _fetchLatest();
+    _realtimeTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLatest());
+    _loadZone();
+  }
+
+  Future<void> _loadZone() async {
+    try {
+      final points = await _apiClient.fetchGeofence(widget.device.id);
+      if (!mounted) return;
+      setState(() => _zonePoints = points);
+    } catch (_) {
+      // La zona es informacion secundaria: si falla, simplemente no se pinta.
+    }
+  }
+
+  @override
+  void dispose() {
+    _realtimeTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<List<LocationPoint>> _fetchWithFilter() {
+    final range = _filter.resolve();
+    return _apiClient.fetchLocations(widget.device.id, from: range.from, to: range.to);
   }
 
   Future<void> _refresh() async {
+    if (_isRealtime) {
+      await _fetchLatest();
+      return;
+    }
     setState(() {
-      _locationsFuture = _apiClient.fetchLocations(widget.device.id);
+      _locationsFuture = _fetchWithFilter();
     });
     await _locationsFuture;
+  }
+
+  Future<void> _fetchLatest() async {
+    try {
+      final locations = await _apiClient.fetchLocations(widget.device.id, limit: 1);
+      if (!mounted) return;
+      setState(() {
+        _latestLocation = locations.isNotEmpty ? locations.first : null;
+        _realtimeError = null;
+        _realtimeLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _realtimeError = e.toString();
+        _realtimeLoading = false;
+      });
+    }
+  }
+
+  void _startRealtime() {
+    _realtimeTimer?.cancel();
+    setState(() {
+      _isRealtime = true;
+      _realtimeLoading = true;
+    });
+    _fetchLatest();
+    _realtimeTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLatest());
+  }
+
+  void _stopRealtime() {
+    _realtimeTimer?.cancel();
+    _realtimeTimer = null;
+    setState(() => _isRealtime = false);
+  }
+
+  Future<void> _pickCustomRange() async {
+    final now = DateTime.now();
+    final fromDate = await showDatePicker(
+      context: context,
+      initialDate: now.subtract(const Duration(hours: 6)),
+      firstDate: DateTime(now.year - 1),
+      lastDate: now,
+      helpText: 'Fecha de inicio',
+    );
+    if (fromDate == null || !mounted) return;
+    final fromTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.subtract(const Duration(hours: 6))),
+      helpText: 'Hora de inicio',
+    );
+    if (fromTime == null || !mounted) return;
+
+    final toDate = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: now,
+      helpText: 'Fecha de fin',
+    );
+    if (toDate == null || !mounted) return;
+    final toTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now),
+      helpText: 'Hora de fin',
+    );
+    if (toTime == null || !mounted) return;
+
+    final from = DateTime(fromDate.year, fromDate.month, fromDate.day, fromTime.hour, fromTime.minute);
+    final to = DateTime(toDate.year, toDate.month, toDate.day, toTime.hour, toTime.minute);
+
+    if (!from.isBefore(to)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La fecha de inicio debe ser anterior a la de fin')),
+      );
+      return;
+    }
+
+    _stopRealtime();
+    setState(() {
+      _filter = TimeRangeFilter.custom(from, to);
+      _locationsFuture = _fetchWithFilter();
+    });
+  }
+
+  Future<void> _openFilterMenu() async {
+    final selection = await showModalBottomSheet<Object>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                Icons.podcasts,
+                color: _isRealtime ? Theme.of(context).colorScheme.primary : null,
+              ),
+              title: const Text('Tiempo real'),
+              subtitle: const Text('Actualiza cada 10 segundos'),
+              selected: _isRealtime,
+              onTap: () => Navigator.of(context).pop(_realtimeChoice),
+            ),
+            const Divider(height: 1),
+            RadioGroup<TimeRangePreset>(
+              groupValue: _isRealtime ? null : _filter.preset,
+              onChanged: (v) => Navigator.of(context).pop(v),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final preset in [
+                    TimeRangePreset.last3h,
+                    TimeRangePreset.last6h,
+                    TimeRangePreset.last9h,
+                    TimeRangePreset.last12h,
+                  ])
+                    RadioListTile<TimeRangePreset>(
+                      title: Text(TimeRangeFilter.preset(preset).label),
+                      value: preset,
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.edit_calendar_outlined),
+                    title: const Text('Personalizado...'),
+                    onTap: () => Navigator.of(context).pop(TimeRangePreset.custom),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selection == null) return;
+
+    if (selection == _realtimeChoice) {
+      _startRealtime();
+      return;
+    }
+
+    if (selection == TimeRangePreset.custom) {
+      await _pickCustomRange();
+      return;
+    }
+
+    _stopRealtime();
+    setState(() {
+      _filter = TimeRangeFilter.preset(selection as TimeRangePreset);
+      _locationsFuture = _fetchWithFilter();
+    });
+  }
+
+  Future<void> _openCreateZone() async {
+    ll.LatLng? initialCenter;
+
+    if (_isRealtime && _latestLocation != null) {
+      initialCenter = ll.LatLng(_latestLocation!.latitude, _latestLocation!.longitude);
+    } else if (!_isRealtime) {
+      try {
+        final locations = await _locationsFuture;
+        if (locations.isNotEmpty) {
+          initialCenter = ll.LatLng(locations.first.latitude, locations.first.longitude);
+        }
+      } catch (_) {
+        // sin datos, se usara el centro por defecto
+      }
+    }
+    if (!mounted) return;
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CreateZoneScreen(device: widget.device, initialCenter: initialCenter),
+      ),
+    );
+
+    if (saved == true) {
+      _loadZone();
+    }
   }
 
   @override
@@ -37,53 +260,230 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.device.name),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              _isRealtime ? 'Tiempo real' : _filter.label,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: Icon(_showList ? Icons.map_outlined : Icons.list),
-            tooltip: _showList ? 'Ver mapa' : 'Ver lista',
-            onPressed: () => setState(() => _showList = !_showList),
+            icon: const Icon(Icons.edit_location_alt_outlined),
+            tooltip: 'Crear zona',
+            onPressed: _openCreateZone,
           ),
+          IconButton(
+            icon: Icon(_isRealtime ? Icons.podcasts : Icons.filter_alt_outlined),
+            tooltip: 'Rango de tiempo',
+            onPressed: _openFilterMenu,
+          ),
+          if (!_isRealtime)
+            IconButton(
+              icon: Icon(_showList ? Icons.map_outlined : Icons.list),
+              tooltip: _showList ? 'Ver mapa' : 'Ver lista',
+              onPressed: () => setState(() => _showList = !_showList),
+            ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: FutureBuilder<List<LocationPoint>>(
-          future: _locationsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'Error: ${snapshot.error}',
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+        child: _isRealtime ? _buildRealtimeBody() : _buildHistoricalBody(),
+      ),
+    );
+  }
+
+  Widget _buildRealtimeBody() {
+    if (_realtimeLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return _RealtimeView(
+      error: _realtimeError,
+      location: _latestLocation,
+      zonePoints: _zonePoints,
+    );
+  }
+
+  Widget _buildHistoricalBody() {
+    return FutureBuilder<List<LocationPoint>>(
+      future: _locationsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return ListView(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Error: ${snapshot.error}',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final locations = snapshot.data ?? [];
+        if (locations.isEmpty) {
+          return ListView(
+            children: const [
+              Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('No hay localizaciones registradas para este device.'),
+              ),
+            ],
+          );
+        }
+
+        return _showList
+            ? _LocationsList(locations: locations)
+            : _RouteMap(locations: locations, zonePoints: _zonePoints);
+      },
+    );
+  }
+}
+
+class _RealtimeView extends StatelessWidget {
+  const _RealtimeView({required this.error, required this.location, this.zonePoints});
+  final String? error;
+  final LocationPoint? location;
+  final List<ll.LatLng>? zonePoints;
+
+  @override
+  Widget build(BuildContext context) {
+    if (error != null) {
+      return ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Error: $error',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (location == null) {
+      return ListView(
+        children: const [
+          Padding(
+            padding: EdgeInsets.all(24),
+            child: _WarningBanner(
+              message: 'No hay ninguna ubicacion en tiempo real disponible para este device.',
+            ),
+          ),
+        ],
+      );
+    }
+
+    final recordedAt = location!.recordedAt;
+    final isStale = recordedAt == null || DateTime.now().difference(recordedAt) > _staleThreshold;
+    final point = ll.LatLng(location!.latitude, location!.longitude);
+
+    return Column(
+      children: [
+        if (isStale)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: _WarningBanner(
+              message: recordedAt == null
+                  ? 'La ultima ubicacion no tiene fecha registrada.'
+                  : 'La ultima ubicacion es de hace ${_formatAge(recordedAt)}. Puede no ser en tiempo real.',
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const Icon(Icons.circle, color: Colors.green, size: 10),
+                const SizedBox(width: 8),
+                Text('En vivo · actualizado hace ${_formatAge(recordedAt)}'),
+              ],
+            ),
+          ),
+        Expanded(
+          child: FlutterMap(
+            options: MapOptions(initialCenter: point, initialZoom: 16),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.the_horse_tracker_app',
+              ),
+              if (zonePoints != null && zonePoints!.length >= 3)
+                PolygonLayer(
+                  polygons: [
+                    Polygon(
+                      points: zonePoints!,
+                      color: Colors.green.withValues(alpha: 0.15),
+                      borderColor: Colors.green,
+                      borderStrokeWidth: 3,
+                    ),
+                  ],
+                ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: point,
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.location_on,
+                      color: isStale ? Colors.grey : Colors.red,
+                      size: 40,
                     ),
                   ),
                 ],
-              );
-            }
-
-            final locations = snapshot.data ?? [];
-            if (locations.isEmpty) {
-              return ListView(
-                children: const [
-                  Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('No hay localizaciones registradas para este device.'),
-                  ),
+              ),
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution('OpenStreetMap contributors'),
                 ],
-              );
-            }
-
-            return _showList
-                ? _LocationsList(locations: locations)
-                : _RouteMap(locations: locations);
-          },
+              ),
+            ],
+          ),
         ),
+      ],
+    );
+  }
+
+  String _formatAge(DateTime timestamp) {
+    final diff = DateTime.now().difference(timestamp);
+    if (diff.inSeconds < 60) return '${diff.inSeconds} s';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
+    if (diff.inHours < 24) return '${diff.inHours} h';
+    return '${diff.inDays} d';
+  }
+}
+
+class _WarningBanner extends StatelessWidget {
+  const _WarningBanner({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: colors.onErrorContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(message, style: TextStyle(color: colors.onErrorContainer)),
+          ),
+        ],
       ),
     );
   }
@@ -114,8 +514,9 @@ class _LocationsList extends StatelessWidget {
 // El backend devuelve las localizaciones de mas reciente a mas antigua;
 // para pintar el recorrido en orden cronologico hay que invertirlas.
 class _RouteMap extends StatelessWidget {
-  const _RouteMap({required this.locations});
+  const _RouteMap({required this.locations, this.zonePoints});
   final List<LocationPoint> locations;
+  final List<ll.LatLng>? zonePoints;
 
   List<LocationPoint> get _chronological => locations.reversed.toList();
 
@@ -130,11 +531,14 @@ class _RouteMap extends StatelessWidget {
     final points = _chronological;
     final latLngPoints = points.map((p) => ll.LatLng(p.latitude, p.longitude)).toList();
     final lastIndex = points.length - 1;
+    final hasZone = zonePoints != null && zonePoints!.length >= 3;
 
-    final mapOptions = latLngPoints.length > 1
+    final boundsPoints = [...latLngPoints, if (hasZone) ...zonePoints!];
+
+    final mapOptions = boundsPoints.length > 1
         ? MapOptions(
             initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints(latLngPoints),
+              bounds: LatLngBounds.fromPoints(boundsPoints),
               padding: const EdgeInsets.all(48),
             ),
           )
@@ -152,6 +556,17 @@ class _RouteMap extends StatelessWidget {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.the_horse_tracker_app',
             ),
+            if (hasZone)
+              PolygonLayer(
+                polygons: [
+                  Polygon(
+                    points: zonePoints!,
+                    color: Colors.green.withValues(alpha: 0.15),
+                    borderColor: Colors.green,
+                    borderStrokeWidth: 3,
+                  ),
+                ],
+              ),
             if (latLngPoints.length > 1)
               PolylineLayer(
                 polylines: [
@@ -184,7 +599,7 @@ class _RouteMap extends StatelessWidget {
             ),
           ],
         ),
-        const Positioned(left: 12, bottom: 12, child: _Legend()),
+        Positioned(left: 12, bottom: 12, child: _Legend(hasZone: hasZone)),
       ],
     );
   }
@@ -234,7 +649,8 @@ class _MarkerIcon extends StatelessWidget {
 }
 
 class _Legend extends StatelessWidget {
-  const _Legend();
+  const _Legend({required this.hasZone});
+  final bool hasZone;
 
   @override
   Widget build(BuildContext context) {
@@ -245,16 +661,22 @@ class _Legend extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.flag, color: Colors.green, size: 16),
-          SizedBox(width: 4),
-          Text('Inicio', style: TextStyle(fontSize: 12)),
-          SizedBox(width: 12),
-          Icon(Icons.location_on, color: Colors.red, size: 16),
-          SizedBox(width: 4),
-          Text('Ultima posicion', style: TextStyle(fontSize: 12)),
+          const Icon(Icons.flag, color: Colors.green, size: 16),
+          const SizedBox(width: 4),
+          const Text('Inicio', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 12),
+          const Icon(Icons.location_on, color: Colors.red, size: 16),
+          const SizedBox(width: 4),
+          const Text('Ultima posicion', style: TextStyle(fontSize: 12)),
+          if (hasZone) ...[
+            const SizedBox(width: 12),
+            Icon(Icons.pentagon_outlined, color: Colors.green.shade700, size: 16),
+            const SizedBox(width: 4),
+            const Text('Zona', style: TextStyle(fontSize: 12)),
+          ],
         ],
       ),
     );

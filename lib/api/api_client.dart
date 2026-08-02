@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 import '../models/admin_device.dart';
 import '../models/admin_user.dart';
@@ -89,10 +90,21 @@ class ApiClient {
         .toList();
   }
 
-  Future<List<LocationPoint>> fetchLocations(String deviceId) async {
-    final res = await http
-        .get(Uri.parse('$apiBaseUrl/api/devices/$deviceId/locations'))
-        .timeout(const Duration(seconds: 15));
+  Future<List<LocationPoint>> fetchLocations(
+    String deviceId, {
+    DateTime? from,
+    DateTime? to,
+    int? limit,
+  }) async {
+    final queryParams = <String, String>{
+      if (from != null) 'from': from.toUtc().toIso8601String(),
+      if (to != null) 'to': to.toUtc().toIso8601String(),
+      if (limit != null) 'limit': limit.toString(),
+    };
+    final uri = Uri.parse('$apiBaseUrl/api/devices/$deviceId/locations')
+        .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+
+    final res = await http.get(uri).timeout(const Duration(seconds: 15));
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
 
@@ -104,6 +116,47 @@ class ApiClient {
     return locations
         .map((e) => LocationPoint.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<LatLng>?> fetchGeofence(String deviceId) async {
+    final res = await http
+        .get(
+          Uri.parse('$apiBaseUrl/api/devices/$deviceId/geofence'),
+          headers: await _authHeaders(),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (res.statusCode != 200) {
+      throw ApiException(body['error'] as String? ?? 'No se pudo obtener la zona guardada');
+    }
+
+    final geofence = body['geofence'] as Map<String, dynamic>?;
+    if (geofence == null) return null;
+
+    final points = geofence['points'] as List<dynamic>? ?? [];
+    return points
+        .map((p) => LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble()))
+        .toList();
+  }
+
+  Future<void> saveGeofence(String deviceId, List<LatLng> points) async {
+    final headers = await _authHeaders();
+    final res = await http
+        .post(
+          Uri.parse('$apiBaseUrl/api/devices/$deviceId/geofence'),
+          headers: {...headers, 'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'points': points.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (res.statusCode != 201) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiException(body['error'] as String? ?? 'No se pudo guardar la zona');
+    }
   }
 
   Future<List<AdminUser>> fetchAdminUsers() async {
