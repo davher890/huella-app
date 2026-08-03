@@ -8,7 +8,9 @@ import '../api/api_client.dart';
 import '../models/device.dart';
 import '../models/location_point.dart';
 import '../models/time_range_filter.dart';
+import '../session/session_store.dart';
 import 'create_zone_screen.dart';
+import 'device_config_screen.dart';
 
 const _realtimeChoice = 'realtime';
 const _staleThreshold = Duration(minutes: 2);
@@ -35,14 +37,23 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
 
   List<ll.LatLng>? _zonePoints;
 
+  bool _isClusters = false;
+  bool _wasRealtimeBeforeClusters = false;
+  Future<List<LocationPoint>>? _clustersFuture;
+
+  bool _isAdmin = false;
+
   @override
   void initState() {
     super.initState();
-    // Por defecto se abre en modo tiempo real; _locationsFuture se rellena
-    // solo si el usuario cambia a un rango historico (ver _openFilterMenu).
+    // Opens in realtime mode by default; _locationsFuture is only filled
+    // in if the user switches to a historical range (see _openFilterMenu).
     _fetchLatest();
     _realtimeTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLatest());
     _loadZone();
+    SessionStore().isAdmin().then((isAdmin) {
+      if (mounted) setState(() => _isAdmin = isAdmin);
+    });
   }
 
   Future<void> _loadZone() async {
@@ -51,7 +62,7 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
       if (!mounted) return;
       setState(() => _zonePoints = points);
     } catch (_) {
-      // La zona es informacion secundaria: si falla, simplemente no se pinta.
+      // The zone is secondary info: if it fails, it just doesn't get drawn.
     }
   }
 
@@ -67,6 +78,13 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
   }
 
   Future<void> _refresh() async {
+    if (_isClusters) {
+      setState(() {
+        _clustersFuture = _apiClient.fetchLocations(widget.device.id);
+      });
+      await _clustersFuture;
+      return;
+    }
     if (_isRealtime) {
       await _fetchLatest();
       return;
@@ -75,6 +93,27 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
       _locationsFuture = _fetchWithFilter();
     });
     await _locationsFuture;
+  }
+
+  void _toggleClusters() {
+    if (_isClusters) {
+      setState(() => _isClusters = false);
+      // On the way out, go back to whatever mode we were in before entering
+      // zones mode; otherwise _locationsFuture might not be initialized yet
+      // (it's never filled in while in realtime mode).
+      if (_wasRealtimeBeforeClusters) {
+        _startRealtime();
+      }
+      return;
+    }
+    _wasRealtimeBeforeClusters = _isRealtime;
+    _stopRealtime();
+    setState(() {
+      _isClusters = true;
+      // Clusters are computed over the full history, ignoring the
+      // current time-range filter.
+      _clustersFuture = _apiClient.fetchLocations(widget.device.id);
+    });
   }
 
   Future<void> _fetchLatest() async {
@@ -239,7 +278,7 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
           initialCenter = ll.LatLng(locations.first.latitude, locations.first.longitude);
         }
       } catch (_) {
-        // sin datos, se usara el centro por defecto
+        // no data, the default center will be used
       }
     }
     if (!mounted) return;
@@ -255,6 +294,14 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     }
   }
 
+  void _openDeviceConfig() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeviceConfigScreen(device: widget.device),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -265,7 +312,7 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              _isRealtime ? 'Tiempo real' : _filter.label,
+              _isClusters ? 'Zonas calculadas' : (_isRealtime ? 'Tiempo real' : _filter.label),
               style: const TextStyle(fontSize: 12),
             ),
           ),
@@ -277,22 +324,80 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
             onPressed: _openCreateZone,
           ),
           IconButton(
-            icon: Icon(_isRealtime ? Icons.podcasts : Icons.filter_alt_outlined),
-            tooltip: 'Rango de tiempo',
-            onPressed: _openFilterMenu,
+            icon: Icon(_isClusters ? Icons.blur_circular : Icons.blur_circular_outlined),
+            tooltip: _isClusters ? 'Ocultar zonas calculadas' : 'Ver zonas calculadas',
+            onPressed: _toggleClusters,
           ),
-          if (!_isRealtime)
+          if (!_isClusters) ...[
             IconButton(
-              icon: Icon(_showList ? Icons.map_outlined : Icons.list),
-              tooltip: _showList ? 'Ver mapa' : 'Ver lista',
-              onPressed: () => setState(() => _showList = !_showList),
+              icon: Icon(_isRealtime ? Icons.podcasts : Icons.filter_alt_outlined),
+              tooltip: 'Rango de tiempo',
+              onPressed: _openFilterMenu,
+            ),
+            if (!_isRealtime)
+              IconButton(
+                icon: Icon(_showList ? Icons.map_outlined : Icons.list),
+                tooltip: _showList ? 'Ver mapa' : 'Ver lista',
+                onPressed: () => setState(() => _showList = !_showList),
+              ),
+          ],
+          if (_isAdmin)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'config') _openDeviceConfig();
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'config', child: Text('Configuracion del device')),
+              ],
             ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: _isRealtime ? _buildRealtimeBody() : _buildHistoricalBody(),
+        child: _isClusters
+            ? _buildClustersBody()
+            : (_isRealtime ? _buildRealtimeBody() : _buildHistoricalBody()),
       ),
+    );
+  }
+
+  Widget _buildClustersBody() {
+    return FutureBuilder<List<LocationPoint>>(
+      future: _clustersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return ListView(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Error: ${snapshot.error}',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final withCluster = (snapshot.data ?? []).where((l) => l.cluster != null && l.cluster! >= 0).toList();
+        if (withCluster.isEmpty) {
+          return ListView(
+            children: const [
+              Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Todavia no hay zonas calculadas para este device.',
+                ),
+              ),
+            ],
+          );
+        }
+
+        return _ClustersMap(locations: withCluster);
+      },
     );
   }
 
@@ -511,8 +616,8 @@ class _LocationsList extends StatelessWidget {
   }
 }
 
-// El backend devuelve las localizaciones de mas reciente a mas antigua;
-// para pintar el recorrido en orden cronologico hay que invertirlas.
+// The backend returns locations from most recent to oldest; to draw the
+// route in chronological order they need to be reversed.
 class _RouteMap extends StatelessWidget {
   const _RouteMap({required this.locations, this.zonePoints});
   final List<LocationPoint> locations;
@@ -677,6 +782,113 @@ class _Legend extends StatelessWidget {
             const SizedBox(width: 4),
             const Text('Zona', style: TextStyle(fontSize: 12)),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// Deterministic color per cluster (golden angle so consecutive colors
+// stay well distinguished even with many clusters).
+Color _colorForCluster(int cluster) {
+  final hue = (cluster * 137.508) % 360;
+  return HSVColor.fromAHSV(1, hue, 0.65, 0.9).toColor();
+}
+
+class _ClustersMap extends StatelessWidget {
+  const _ClustersMap({required this.locations});
+  final List<LocationPoint> locations;
+
+  @override
+  Widget build(BuildContext context) {
+    final latLngPoints = locations.map((l) => ll.LatLng(l.latitude, l.longitude)).toList();
+    final clusterIds = locations.map((l) => l.cluster!).toSet().toList()..sort();
+
+    final mapOptions = latLngPoints.length > 1
+        ? MapOptions(
+            initialCameraFit: CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints(latLngPoints),
+              padding: const EdgeInsets.all(48),
+            ),
+          )
+        : MapOptions(
+            initialCenter: latLngPoints.first,
+            initialZoom: 15,
+          );
+
+    return Stack(
+      children: [
+        FlutterMap(
+          options: mapOptions,
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.the_horse_tracker_app',
+            ),
+            CircleLayer(
+              circles: [
+                for (var i = 0; i < locations.length; i++)
+                  CircleMarker(
+                    point: latLngPoints[i],
+                    radius: 10,
+                    useRadiusInMeter: true,
+                    color: _colorForCluster(locations[i].cluster!).withValues(alpha: 0.35),
+                    borderStrokeWidth: 2,
+                    borderColor: _colorForCluster(locations[i].cluster!),
+                  ),
+              ],
+            ),
+            RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution('OpenStreetMap contributors'),
+              ],
+            ),
+          ],
+        ),
+        Positioned(
+          left: 12,
+          bottom: 12,
+          right: 12,
+          child: _ClustersLegend(clusterIds: clusterIds),
+        ),
+      ],
+    );
+  }
+}
+
+class _ClustersLegend extends StatelessWidget {
+  const _ClustersLegend({required this.clusterIds});
+  final List<int> clusterIds;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          for (final cluster in clusterIds)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: _colorForCluster(cluster),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text('Zona $cluster', style: const TextStyle(fontSize: 12)),
+              ],
+            ),
         ],
       ),
     );

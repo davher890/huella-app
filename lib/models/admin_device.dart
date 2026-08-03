@@ -5,9 +5,9 @@ class AdminDevice {
     required this.name,
   });
 
-  // id interno (entero) de la tabla devices, usado para asignarlo a un usuario.
+  // Internal (integer) id from the devices table, used to assign it to a user.
   final int dbId;
-  // identificador de texto (ej. "device-01"), usado para pedir localizaciones.
+  // Text identifier (e.g. "device-01"), used to request locations.
   final String deviceId;
   final String name;
 

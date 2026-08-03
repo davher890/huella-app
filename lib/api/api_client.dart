@@ -8,7 +8,8 @@ import '../models/device.dart';
 import '../models/location_point.dart';
 import '../session/session_store.dart';
 
-const apiBaseUrl = 'http://192.168.18.2:3000'; // 'https://the-horse-tracker-api.vercel.app';
+// const apiBaseUrl = 'http://192.168.18.2:3000';
+const apiBaseUrl = 'https://the-horse-tracker-api.vercel.app';
 
 class ApiException implements Exception {
   ApiException(this.message);
@@ -156,6 +157,39 @@ class ApiClient {
     if (res.statusCode != 201) {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       throw ApiException(body['error'] as String? ?? 'No se pudo guardar la zona');
+    }
+  }
+
+  Future<int?> fetchDeviceConfig(String deviceId) async {
+    final res = await http
+        .get(
+          Uri.parse('$apiBaseUrl/api/devices/$deviceId/configuration'),
+          headers: await _authHeaders(),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (res.statusCode != 200) {
+      throw ApiException(body['error'] as String? ?? 'No se pudo obtener la configuracion');
+    }
+
+    return (body['sleep_interval'] as num?)?.toInt();
+  }
+
+  Future<void> updateDeviceConfig(String deviceId, int sleepInterval) async {
+    final headers = await _authHeaders();
+    final res = await http
+        .patch(
+          Uri.parse('$apiBaseUrl/api/devices/$deviceId/configuration'),
+          headers: {...headers, 'Content-Type': 'application/json'},
+          body: jsonEncode({'sleep_interval': sleepInterval}),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (res.statusCode != 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiException(body['error'] as String? ?? 'No se pudo actualizar la configuracion');
     }
   }
 
