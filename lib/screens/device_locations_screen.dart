@@ -9,6 +9,7 @@ import '../models/device.dart';
 import '../models/location_point.dart';
 import '../models/time_range_filter.dart';
 import '../session/session_store.dart';
+import '../utils/palette.dart';
 import 'create_zone_screen.dart';
 import 'device_config_screen.dart';
 
@@ -788,13 +789,6 @@ class _Legend extends StatelessWidget {
   }
 }
 
-// Deterministic color per cluster (golden angle so consecutive colors
-// stay well distinguished even with many clusters).
-Color _colorForCluster(int cluster) {
-  final hue = (cluster * 137.508) % 360;
-  return HSVColor.fromAHSV(1, hue, 0.65, 0.9).toColor();
-}
-
 class _ClustersMap extends StatelessWidget {
   const _ClustersMap({required this.locations});
   final List<LocationPoint> locations;
@@ -832,9 +826,9 @@ class _ClustersMap extends StatelessWidget {
                     point: latLngPoints[i],
                     radius: 10,
                     useRadiusInMeter: true,
-                    color: _colorForCluster(locations[i].cluster!).withValues(alpha: 0.35),
+                    color: colorForIndex(locations[i].cluster!).withValues(alpha: 0.35),
                     borderStrokeWidth: 2,
-                    borderColor: _colorForCluster(locations[i].cluster!),
+                    borderColor: colorForIndex(locations[i].cluster!),
                   ),
               ],
             ),
@@ -881,7 +875,7 @@ class _ClustersLegend extends StatelessWidget {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: _colorForCluster(cluster),
+                    color: colorForIndex(cluster),
                     shape: BoxShape.circle,
                   ),
                 ),

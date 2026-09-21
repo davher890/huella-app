@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'navigation.dart';
 import 'screens/device_list_screen.dart';
 import 'screens/login_screen.dart';
 import 'session/session_store.dart';
@@ -14,6 +15,7 @@ class HorseTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Horse Tracker',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2d4a34)),

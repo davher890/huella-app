@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../models/device.dart';
 import '../session/session_store.dart';
+import 'account_screen.dart';
 import 'admin/admin_screen.dart';
+import 'all_devices_map_screen.dart';
 import 'device_locations_screen.dart';
 import 'login_screen.dart';
 
@@ -50,6 +52,15 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       appBar: AppBar(
         title: const Text('Mis devices'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.map_outlined),
+            tooltip: 'Ver todos en el mapa',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AllDevicesMapScreen()),
+              );
+            },
+          ),
           if (_isAdmin)
             IconButton(
               icon: const Icon(Icons.admin_panel_settings_outlined),
@@ -60,6 +71,15 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                 );
               },
             ),
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Mi cuenta',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AccountScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesion',

@@ -45,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: result.accessToken,
         userEmail: result.userEmail,
         role: result.role,
+        userName: result.userName,
       );
 
       if (!mounted) return;
@@ -55,6 +56,57 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _openForgotPasswordDialog(BuildContext context) async {
+    final emailController = TextEditingController(text: _emailController.text.trim());
+    final formKey = GlobalKey<FormState>();
+
+    final email = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Recuperar contraseña'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: emailController,
+            keyboardType: TextInputType.emailAddress,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Email'),
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Introduce tu email' : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(dialogContext).pop(emailController.text.trim());
+              }
+            },
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
+    );
+
+    emailController.dispose();
+    if (email == null || !context.mounted) return;
+
+    try {
+      await _apiClient.sendPasswordReset(email);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Si el email existe, te hemos enviado un enlace para restablecer la contraseña.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -90,11 +142,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _passwordController,
                     obscureText: true,
                     decoration: const InputDecoration(
-                      labelText: 'Contrasena',
+                      labelText: 'Contraseña',
                       border: OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Introduce tu contrasena' : null,
+                        (v == null || v.isEmpty) ? 'Introduce tu contraseña' : null,
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
@@ -110,6 +162,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Entrar'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _loading ? null : () => _openForgotPasswordDialog(context),
+                    child: const Text('Olvide mi contraseña'),
                   ),
                 ],
               ),
