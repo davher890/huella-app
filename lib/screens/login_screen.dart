@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../session/session_store.dart';
 import 'device_list_screen.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -110,6 +111,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _openSignUp() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const SignUpScreen()),
+    );
+
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cuenta creada. Ya puedes iniciar sesion.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,6 +180,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: _loading ? null : () => _openForgotPasswordDialog(context),
                     child: const Text('Olvide mi contraseña'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _loading ? null : _openSignUp,
+                    child: const Text('Sign up'),
                   ),
                 ],
               ),

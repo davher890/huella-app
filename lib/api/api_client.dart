@@ -108,6 +108,25 @@ class ApiClient {
     );
   }
 
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String name,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$apiBaseUrl/api/user'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email, 'password': password, 'name': name}),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (res.statusCode != 201) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiException(body['error'] as String? ?? 'No se pudo crear la cuenta');
+    }
+  }
+
   Future<void> updateProfile({String? name, String? password}) async {
     final headers = await _authHeaders();
     final body = <String, dynamic>{
@@ -174,7 +193,7 @@ class ApiClient {
     final uri = Uri.parse('$apiBaseUrl/api/devices/$deviceId/locations')
         .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
 
-    final res = await http.get(uri).timeout(const Duration(seconds: 15));
+    final res = await _send(() async => http.get(uri, headers: await _authHeaders()));
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
 
@@ -182,12 +201,10 @@ class ApiClient {
       throw ApiException(body['error'] as String? ?? 'No se pudieron obtener las localizaciones');
     }
 
-    final locs = body['locations'] as List<dynamic>? ?? [];
-    final locations = locs
+    final locations = body['locations'] as List<dynamic>? ?? [];
+    return locations
         .map((e) => LocationPoint.fromJson(e as Map<String, dynamic>))
         .toList();
-    final distance = body['distance'] as num?;
-    return locations;
   }
 
   Future<List<LatLng>?> fetchGeofence(String deviceId) async {
@@ -272,6 +289,19 @@ class ApiClient {
     return users
         .map((e) => AdminUser.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<void> deleteUser(String userId) async {
+    final headers = await _authHeaders();
+    final res = await _send(() => http.delete(
+          Uri.parse('$apiBaseUrl/api/admin/users/$userId'),
+          headers: headers,
+        ));
+
+    if (res.statusCode != 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiException(body['error'] as String? ?? 'No se pudo eliminar el usuario');
+    }
   }
 
   Future<List<AdminDevice>> fetchUserDevices(String userId) async {

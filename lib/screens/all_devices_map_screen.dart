@@ -34,7 +34,7 @@ class _AllDevicesMapScreenState extends State<AllDevicesMapScreen> {
     final devices = await _apiClient.fetchDevices();
     return Future.wait(devices.map((device) async {
       try {
-        final locations = await _apiClient.fetchLocations(device.id);
+        final locations = await _apiClient.fetchLocations(device.id, limit: 1);
         return _DeviceTrail(device: device, locations: locations);
       } catch (_) {
         // If one device fails to load, still show the rest.
@@ -127,23 +127,6 @@ class _AllDevicesMap extends StatelessWidget {
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.the_horse_tracker_app',
-            ),
-            PolylineLayer(
-              polylines: [
-                for (var i = 0; i < trails.length; i++)
-                  if (trails[i].locations.length > 1)
-                    Polyline(
-                      // Backend returns most-recent-first; reverse for a
-                      // chronological path.
-                      points: trails[i]
-                          .locations
-                          .reversed
-                          .map((l) => ll.LatLng(l.latitude, l.longitude))
-                          .toList(),
-                      strokeWidth: 4,
-                      color: colorForIndex(i),
-                    ),
-              ],
             ),
             MarkerLayer(
               markers: [
