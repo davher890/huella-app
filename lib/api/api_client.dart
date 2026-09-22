@@ -193,7 +193,7 @@ class ApiClient {
     final uri = Uri.parse('$apiBaseUrl/api/devices/$deviceId/locations')
         .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
 
-    final res = await http.get(uri).timeout(const Duration(seconds: 15));
+    final res = await _send(() async => http.get(uri, headers: await _authHeaders()));
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
 
@@ -201,12 +201,10 @@ class ApiClient {
       throw ApiException(body['error'] as String? ?? 'No se pudieron obtener las localizaciones');
     }
 
-    final locs = body['locations'] as List<dynamic>? ?? [];
-    final locations = locs
+    final locations = body['locations'] as List<dynamic>? ?? [];
+    return locations
         .map((e) => LocationPoint.fromJson(e as Map<String, dynamic>))
         .toList();
-    final distance = body['distance'] as num?;
-    return locations;
   }
 
   Future<List<LatLng>?> fetchGeofence(String deviceId) async {
