@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SessionStore {
@@ -6,14 +7,17 @@ class SessionStore {
   static const _keyUserName = 'session_user_name';
   static const _keyRole = 'session_role';
 
+  static const _secureStorage = FlutterSecureStorage();
+
   Future<void> save({
     required String accessToken,
     required String userEmail,
     required String role,
     String? userName,
   }) async {
+    await _secureStorage.write(key: _keyAccessToken, value: accessToken);
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyAccessToken, accessToken);
     await prefs.setString(_keyUserEmail, userEmail);
     await prefs.setString(_keyRole, role);
     if (userName != null) {
@@ -28,9 +32,8 @@ class SessionStore {
     await prefs.setString(_keyUserName, userName);
   }
 
-  Future<String?> readAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyAccessToken);
+  Future<String?> readAccessToken() {
+    return _secureStorage.read(key: _keyAccessToken);
   }
 
   Future<String?> readUserEmail() async {
@@ -49,8 +52,9 @@ class SessionStore {
   }
 
   Future<void> clear() async {
+    await _secureStorage.delete(key: _keyAccessToken);
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyAccessToken);
     await prefs.remove(_keyUserEmail);
     await prefs.remove(_keyUserName);
     await prefs.remove(_keyRole);

@@ -51,7 +51,7 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         body: TabBarView(
           children: [
-            _UsersTab(usersFuture: _usersFuture, onRefresh: _refresh),
+            _UsersTab(usersFuture: _usersFuture, onRefresh: _refresh, apiClient: _apiClient),
             _DevicesTab(devicesFuture: _devicesFuture, onRefresh: _refresh),
             _AssignTab(
               usersFuture: _usersFuture,
@@ -66,9 +66,40 @@ class _AdminScreenState extends State<AdminScreen> {
 }
 
 class _UsersTab extends StatelessWidget {
-  const _UsersTab({required this.usersFuture, required this.onRefresh});
+  const _UsersTab({required this.usersFuture, required this.onRefresh, required this.apiClient});
   final Future<List<AdminUser>> usersFuture;
   final Future<void> Function() onRefresh;
+  final ApiClient apiClient;
+
+  Future<void> _confirmDelete(BuildContext context, AdminUser user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar usuario'),
+        content: Text('¿Seguro que quieres eliminar a ${user.email}? Esta accion no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await apiClient.deleteUser(user.id);
+      await onRefresh();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +126,18 @@ class _UsersTab extends StatelessWidget {
               return ListTile(
                 leading: const Icon(Icons.person_outline),
                 title: Text(user.email),
-                trailing: Chip(label: Text(user.role)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Chip(label: Text(user.role)),
+                    if (user.role != 'admin')
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Eliminar usuario',
+                        onPressed: () => _confirmDelete(context, user),
+                      ),
+                  ],
+                ),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => UserDevicesScreen(user: user)),
