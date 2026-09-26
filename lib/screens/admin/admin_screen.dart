@@ -329,7 +329,7 @@ class _AssignTabState extends State<_AssignTab> {
                   style: TextStyle(
                     color: _messageIsError
                         ? Theme.of(context).colorScheme.error
-                        : Colors.green,
+                        : Theme.of(context).colorScheme.secondary,
                   ),
                 ),
               ],

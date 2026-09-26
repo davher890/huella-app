@@ -8,10 +8,9 @@ import '../api/api_client.dart';
 import '../models/device.dart';
 import '../models/location_point.dart';
 import '../models/time_range_filter.dart';
-import '../session/session_store.dart';
+import '../theme/app_theme.dart';
 import '../utils/palette.dart';
 import 'create_zone_screen.dart';
-import 'device_config_screen.dart';
 
 const _realtimeChoice = 'realtime';
 const _staleThreshold = Duration(minutes: 2);
@@ -27,6 +26,7 @@ class DeviceLocationsScreen extends StatefulWidget {
 class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
   final _apiClient = ApiClient();
   late Future<List<LocationPoint>> _locationsFuture;
+  Future<double>? _distanceFuture;
   bool _showList = false;
   TimeRangeFilter _filter = const TimeRangeFilter.preset(TimeRangePreset.last6h);
 
@@ -42,8 +42,6 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
   bool _wasRealtimeBeforeClusters = false;
   Future<List<LocationPoint>>? _clustersFuture;
 
-  bool _isAdmin = false;
-
   @override
   void initState() {
     super.initState();
@@ -52,9 +50,6 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     _fetchLatest();
     _realtimeTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLatest());
     _loadZone();
-    SessionStore().isAdmin().then((isAdmin) {
-      if (mounted) setState(() => _isAdmin = isAdmin);
-    });
   }
 
   Future<void> _loadZone() async {
@@ -78,6 +73,11 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     return _apiClient.fetchLocations(widget.device.id, from: range.from, to: range.to);
   }
 
+  Future<double> _fetchDistance() {
+    final range = _filter.resolve();
+    return _apiClient.fetchDeviceDistance(widget.device.id, from: range.from, to: range.to);
+  }
+
   Future<void> _refresh() async {
     if (_isClusters) {
       setState(() {
@@ -92,6 +92,7 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     }
     setState(() {
       _locationsFuture = _fetchWithFilter();
+      _distanceFuture = _fetchDistance();
     });
     await _locationsFuture;
   }
@@ -198,6 +199,7 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     setState(() {
       _filter = TimeRangeFilter.custom(from, to);
       _locationsFuture = _fetchWithFilter();
+      _distanceFuture = _fetchDistance();
     });
   }
 
@@ -264,6 +266,7 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     setState(() {
       _filter = TimeRangeFilter.preset(selection as TimeRangePreset);
       _locationsFuture = _fetchWithFilter();
+      _distanceFuture = _fetchDistance();
     });
   }
 
@@ -293,14 +296,6 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     if (saved == true) {
       _loadZone();
     }
-  }
-
-  void _openDeviceConfig() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DeviceConfigScreen(device: widget.device),
-      ),
-    );
   }
 
   @override
@@ -342,15 +337,6 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
                 onPressed: () => setState(() => _showList = !_showList),
               ),
           ],
-          if (_isAdmin)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'config') _openDeviceConfig();
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'config', child: Text('Configuracion del device')),
-              ],
-            ),
         ],
       ),
       body: RefreshIndicator(
@@ -435,20 +421,25 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
         }
 
         final locations = snapshot.data ?? [];
-        if (locations.isEmpty) {
-          return ListView(
-            children: const [
-              Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('No hay localizaciones registradas para este device.'),
-              ),
-            ],
-          );
+        if (_showList) {
+          if (locations.isEmpty) {
+            return ListView(
+              children: const [
+                Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('No hay localizaciones registradas para este device.'),
+                ),
+              ],
+            );
+          }
+          return _LocationsList(locations: locations);
         }
 
-        return _showList
-            ? _LocationsList(locations: locations)
-            : _RouteMap(locations: locations, zonePoints: _zonePoints);
+        return _RouteMap(
+          locations: locations,
+          zonePoints: _zonePoints,
+          distanceFuture: _distanceFuture,
+        );
       },
     );
   }
@@ -509,7 +500,7 @@ class _RealtimeView extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const Icon(Icons.circle, color: Colors.green, size: 10),
+                const Icon(Icons.circle, color: AppColors.cyan, size: 10),
                 const SizedBox(width: 8),
                 Text('En vivo · actualizado hace ${_formatAge(recordedAt)}'),
               ],
@@ -519,18 +510,22 @@ class _RealtimeView extends StatelessWidget {
           child: FlutterMap(
             options: MapOptions(initialCenter: point, initialZoom: 16),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.the_horse_tracker_app',
+              ColorFiltered(
+                colorFilter: darkTileColorFilter,
+                child: TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.the_horse_tracker_app',
+                ),
               ),
               if (zonePoints != null && zonePoints!.length >= 3)
                 PolygonLayer(
                   polygons: [
                     Polygon(
                       points: zonePoints!,
-                      color: Colors.green.withValues(alpha: 0.15),
-                      borderColor: Colors.green,
+                      color: AppColors.olive.withValues(alpha: 0.15),
+                      borderColor: AppColors.olive,
                       borderStrokeWidth: 3,
+                      pattern: StrokePattern.dashed(segments: const [8, 6]),
                     ),
                   ],
                 ),
@@ -542,7 +537,7 @@ class _RealtimeView extends StatelessWidget {
                     height: 40,
                     child: Icon(
                       Icons.location_on,
-                      color: isStale ? Colors.grey : Colors.red,
+                      color: isStale ? AppColors.textFaint : AppColors.cyan,
                       size: 40,
                     ),
                   ),
@@ -620,16 +615,22 @@ class _LocationsList extends StatelessWidget {
 // The backend returns locations from most recent to oldest; to draw the
 // route in chronological order they need to be reversed.
 class _RouteMap extends StatelessWidget {
-  const _RouteMap({required this.locations, this.zonePoints});
+  const _RouteMap({required this.locations, this.zonePoints, this.distanceFuture});
   final List<LocationPoint> locations;
   final List<ll.LatLng>? zonePoints;
+  final Future<double>? distanceFuture;
+
+  // Roughly centers the whole country when there's no location (or zone)
+  // data to fit the camera to.
+  static const _spainCenter = ll.LatLng(40.4168, -3.7038);
+  static const _spainZoom = 5.5;
 
   List<LocationPoint> get _chronological => locations.reversed.toList();
 
   Color _colorForIndex(int index, int count) {
-    if (count <= 1) return Colors.orange;
+    if (count <= 1) return AppColors.amber;
     final t = index / (count - 1);
-    return Color.lerp(Colors.blue, Colors.deepOrange, t)!;
+    return Color.lerp(AppColors.textFaint, AppColors.amber, t)!;
   }
 
   @override
@@ -641,42 +642,61 @@ class _RouteMap extends StatelessWidget {
 
     final boundsPoints = [...latLngPoints, if (hasZone) ...zonePoints!];
 
-    final mapOptions = boundsPoints.length > 1
-        ? MapOptions(
-            initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints(boundsPoints),
-              padding: const EdgeInsets.all(48),
-            ),
-          )
-        : MapOptions(
-            initialCenter: latLngPoints.first,
-            initialZoom: 15,
-          );
+    // CameraFit.bounds computes an infinite zoom (and throws) when the
+    // bounds have zero area, e.g. every point sits at the exact same
+    // coordinate (a stationary device). Treat that the same as a single
+    // point instead of fitting to a degenerate box.
+    final bounds = boundsPoints.length > 1 ? LatLngBounds.fromPoints(boundsPoints) : null;
+    final hasSpread = bounds != null && (bounds.north != bounds.south || bounds.east != bounds.west);
+
+    final MapOptions mapOptions;
+    if (hasSpread) {
+      mapOptions = MapOptions(
+        initialCameraFit: CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(48),
+          maxZoom: 18,
+        ),
+      );
+    } else if (latLngPoints.isNotEmpty) {
+      mapOptions = MapOptions(initialCenter: latLngPoints.first, initialZoom: 15);
+    } else {
+      mapOptions = const MapOptions(initialCenter: _spainCenter, initialZoom: _spainZoom);
+    }
 
     return Stack(
       children: [
         FlutterMap(
+          // MapOptions' initialCenter/initialCameraFit are only applied the
+          // first time the underlying MapController is created; without a
+          // key that changes with the data, selecting a new date range
+          // rebuilds this widget but the camera stays wherever it was.
+          key: ValueKey(locations),
           options: mapOptions,
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.the_horse_tracker_app',
+            ColorFiltered(
+              colorFilter: darkTileColorFilter,
+              child: TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.the_horse_tracker_app',
+              ),
             ),
             if (hasZone)
               PolygonLayer(
                 polygons: [
                   Polygon(
                     points: zonePoints!,
-                    color: Colors.green.withValues(alpha: 0.15),
-                    borderColor: Colors.green,
+                    color: AppColors.olive.withValues(alpha: 0.15),
+                    borderColor: AppColors.olive,
                     borderStrokeWidth: 3,
+                    pattern: StrokePattern.dashed(segments: const [8, 6]),
                   ),
                 ],
               ),
             if (latLngPoints.length > 1)
               PolylineLayer(
                 polylines: [
-                  Polyline(points: latLngPoints, strokeWidth: 4, color: Colors.blueGrey),
+                  Polyline(points: latLngPoints, strokeWidth: 4, color: AppColors.amber),
                 ],
               ),
             MarkerLayer(
@@ -705,7 +725,28 @@ class _RouteMap extends StatelessWidget {
             ),
           ],
         ),
-        Positioned(left: 12, bottom: 12, child: _Legend(hasZone: hasZone)),
+        if (points.isEmpty)
+          Positioned(
+            top: 12,
+            left: 12,
+            right: 12,
+            child: _WarningBanner(
+              message: 'No hay localizaciones registradas para este device en el rango seleccionado.',
+            ),
+          )
+        else ...[
+          Positioned(
+            left: 12,
+            bottom: MediaQuery.paddingOf(context).bottom + 12,
+            child: _Legend(hasZone: hasZone),
+          ),
+          if (distanceFuture != null)
+            Positioned(
+              right: 12,
+              bottom: MediaQuery.paddingOf(context).bottom + 12,
+              child: _DistanceLegend(distanceFuture: distanceFuture!),
+            ),
+        ],
       ],
     );
   }
@@ -739,16 +780,16 @@ class _MarkerIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isFirst) {
-      return const Icon(Icons.flag, color: Colors.green, size: 32);
+      return const Icon(Icons.flag, color: AppColors.textDim, size: 32);
     }
     if (isLast) {
-      return const Icon(Icons.location_on, color: Colors.red, size: 36);
+      return const Icon(Icons.location_on, color: AppColors.cyan, size: 36);
     }
     return Container(
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.5),
+        border: Border.all(color: AppColors.text, width: 1.5),
       ),
     );
   }
@@ -770,20 +811,68 @@ class _Legend extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.flag, color: Colors.green, size: 16),
+          const Icon(Icons.flag, color: AppColors.textDim, size: 16),
           const SizedBox(width: 4),
           const Text('Inicio', style: TextStyle(fontSize: 12)),
           const SizedBox(width: 12),
-          const Icon(Icons.location_on, color: Colors.red, size: 16),
+          const Icon(Icons.location_on, color: AppColors.cyan, size: 16),
           const SizedBox(width: 4),
           const Text('Ultima posicion', style: TextStyle(fontSize: 12)),
           if (hasZone) ...[
             const SizedBox(width: 12),
-            Icon(Icons.pentagon_outlined, color: Colors.green.shade700, size: 16),
+            const Icon(Icons.pentagon_outlined, color: AppColors.olive, size: 16),
             const SizedBox(width: 4),
             const Text('Zona', style: TextStyle(fontSize: 12)),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _DistanceLegend extends StatelessWidget {
+  const _DistanceLegend({required this.distanceFuture});
+  final Future<double> distanceFuture;
+
+  String _formatDistance(double meters) {
+    if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)} km';
+    return '${meters.round()} m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: FutureBuilder<double>(
+        future: distanceFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          }
+          if (snapshot.hasError) {
+            return const Text('Distancia: --', style: TextStyle(fontSize: 12));
+          }
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.straighten, color: AppColors.amber, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                'Distancia recorrida: ${_formatDistance(snapshot.data!)}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -798,11 +887,17 @@ class _ClustersMap extends StatelessWidget {
     final latLngPoints = locations.map((l) => ll.LatLng(l.latitude, l.longitude)).toList();
     final clusterIds = locations.map((l) => l.cluster!).toSet().toList()..sort();
 
-    final mapOptions = latLngPoints.length > 1
+    // See _RouteMap for why zero-area bounds (all points identical) need
+    // to be treated as a single point instead of passed to CameraFit.bounds.
+    final bounds = latLngPoints.length > 1 ? LatLngBounds.fromPoints(latLngPoints) : null;
+    final hasSpread = bounds != null && (bounds.north != bounds.south || bounds.east != bounds.west);
+
+    final mapOptions = hasSpread
         ? MapOptions(
             initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints(latLngPoints),
+              bounds: bounds,
               padding: const EdgeInsets.all(48),
+              maxZoom: 18,
             ),
           )
         : MapOptions(
@@ -841,7 +936,7 @@ class _ClustersMap extends StatelessWidget {
         ),
         Positioned(
           left: 12,
-          bottom: 12,
+          bottom: MediaQuery.paddingOf(context).bottom + 12,
           right: 12,
           child: _ClustersLegend(clusterIds: clusterIds),
         ),

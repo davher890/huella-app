@@ -207,6 +207,27 @@ class ApiClient {
         .toList();
   }
 
+  // Distance in meters covered between the first and last location in the
+  // given range (or the whole history if from/to are omitted).
+  Future<double> fetchDeviceDistance(String deviceId, {DateTime? from, DateTime? to}) async {
+    final queryParams = <String, String>{
+      if (from != null) 'from': from.toUtc().toIso8601String(),
+      if (to != null) 'to': to.toUtc().toIso8601String(),
+    };
+    final uri = Uri.parse('$apiBaseUrl/api/devices/$deviceId/statistics')
+        .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+
+    final res = await _send(() async => http.get(uri, headers: await _authHeaders()));
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (res.statusCode != 200) {
+      throw ApiException(body['error'] as String? ?? 'No se pudieron obtener las estadisticas');
+    }
+
+    return (body['distance'] as num?)?.toDouble() ?? 0;
+  }
+
   Future<List<LatLng>?> fetchGeofence(String deviceId) async {
     final res = await _send(() async => http.get(
           Uri.parse('$apiBaseUrl/api/devices/$deviceId/geofence'),
@@ -241,35 +262,6 @@ class ApiClient {
     if (res.statusCode != 201) {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       throw ApiException(body['error'] as String? ?? 'No se pudo guardar la zona');
-    }
-  }
-
-  Future<int?> fetchDeviceConfig(String deviceId) async {
-    final res = await _send(() async => http.get(
-          Uri.parse('$apiBaseUrl/api/devices/$deviceId/configuration'),
-          headers: await _authHeaders(),
-        ));
-
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-
-    if (res.statusCode != 200) {
-      throw ApiException(body['error'] as String? ?? 'No se pudo obtener la configuracion');
-    }
-
-    return (body['sleep_interval'] as num?)?.toInt();
-  }
-
-  Future<void> updateDeviceConfig(String deviceId, int sleepInterval) async {
-    final headers = await _authHeaders();
-    final res = await _send(() => http.patch(
-          Uri.parse('$apiBaseUrl/api/devices/$deviceId/configuration'),
-          headers: {...headers, 'Content-Type': 'application/json'},
-          body: jsonEncode({'sleep_interval': sleepInterval}),
-        ));
-
-    if (res.statusCode != 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw ApiException(body['error'] as String? ?? 'No se pudo actualizar la configuracion');
     }
   }
 

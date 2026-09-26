@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart' as ll;
 
 import '../api/api_client.dart';
 import '../models/device.dart';
+import '../theme/app_theme.dart';
 
 class CreateZoneScreen extends StatefulWidget {
   const CreateZoneScreen({super.key, required this.device, this.initialCenter});
@@ -119,25 +120,29 @@ class _CreateZoneScreenState extends State<CreateZoneScreen> {
                       onTap: (_, point) => _addPoint(point),
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.the_horse_tracker_app',
+                      ColorFiltered(
+                        colorFilter: darkTileColorFilter,
+                        child: TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.the_horse_tracker_app',
+                        ),
                       ),
                       if (_points.length >= 3)
                         PolygonLayer(
                           polygons: [
                             Polygon(
                               points: _points,
-                              color: Colors.blue.withValues(alpha: 0.2),
-                              borderColor: Colors.blue,
+                              color: AppColors.olive.withValues(alpha: 0.2),
+                              borderColor: AppColors.olive,
                               borderStrokeWidth: 3,
+                              pattern: StrokePattern.dashed(segments: const [8, 6]),
                             ),
                           ],
                         )
                       else if (_points.length == 2)
                         PolylineLayer(
                           polylines: [
-                            Polyline(points: _points, strokeWidth: 3, color: Colors.blue),
+                            Polyline(points: _points, strokeWidth: 3, color: AppColors.olive),
                           ],
                         ),
                       MarkerLayer(
@@ -149,15 +154,15 @@ class _CreateZoneScreenState extends State<CreateZoneScreen> {
                               height: 24,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.blue,
+                                  color: AppColors.olive,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(color: AppColors.text, width: 2),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   '${i + 1}',
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: AppColors.onAmber,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),

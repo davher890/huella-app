@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Huella GPS — Localización en tiempo real para vehículos, flotas y animales</title>
+<meta name="description" content="Alquila un localizador GPS 4G sin compromiso de compra. Localización en tiempo real, alertas de geovalla, distancia recorrida y gestión de dispositivos desde una sola app. Para taxis, furgonetas de reparto, alquiler de vehículos y ganado.">
+
+<!-- Open Graph -->
+<meta property="og:title" content="Huella GPS — No pierdas la pista">
+<meta property="og:description" content="Localización en tiempo real de vehículos, flotas y animales. Alquiler sin permanencia, deposito reembolsable.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_ES">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2238%22 r=%2222%22 fill=%22%23E8873D%22/><path d=%22M50 60 L50 90%22 stroke=%22%23E8873D%22 stroke-width=%2214%22 stroke-linecap=%22round%22/></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #10141A;
+    --panel: #171D26;
+    --panel-2: #1E2630;
+    --line: #2A3340;
+    --text: #EDEEF0;
+    --text-dim: #8B94A3;
+    --text-faint: #5B6472;
+    --amber: #E8873D;
+    --amber-dim: #B96A2E;
+    --cyan: #2FD6C0;
+    --olive: #7C8A5C;
+    --danger: #E0654F;
+    --radius-panel: 14px;
+    --radius-chip: 8px;
+    --maxw: 1180px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
+  }
+
+  h1,h2,h3{
+    font-family:'Big Shoulders Display', sans-serif;
+    font-weight:800;
+    letter-spacing:0.2px;
+    margin:0;
+    color:var(--text);
+  }
+  a{color:inherit;}
+  img,svg{display:block; max-width:100%;}
+
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 28px;}
+  @media (max-width:640px){.wrap{padding:0 20px;}}
+
+  :focus-visible{outline:2px solid var(--amber); outline-offset:3px; border-radius:4px;}
+
+  /* ---------- BUTTONS ---------- */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    font-family:'Inter'; font-weight:600; font-size:0.95rem;
+    padding:13px 26px; border-radius:9px; border:1px solid transparent;
+    cursor:pointer; text-decoration:none; transition:transform .15s ease, background .15s ease, border-color .15s ease;
+    line-height:1;
+  }
+  .btn:hover{transform:translateY(-1px);}
+  .btn-primary{background:var(--amber); color:#171203;}
+  .btn-primary:hover{background:#f0994f;}
+  .btn-ghost{background:transparent; color:var(--text); border-color:var(--line);}
+  .btn-ghost:hover{border-color:var(--text-dim);}
+
+  /* ---------- NAV ---------- */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(16,20,26,0.86); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 0;
+  }
+  .logo{
+    display:flex; align-items:center; gap:10px;
+    font-family:'Big Shoulders Display'; font-weight:800; font-size:1.4rem;
+    color:var(--text); text-decoration:none;
+  }
+  .logo-mark{width:26px; height:26px; flex-shrink:0;}
+  .nav-links{display:flex; align-items:center; gap:30px; list-style:none; margin:0; padding:0;}
+  .nav-links a{
+    text-decoration:none; color:var(--text-dim); font-size:0.94rem; font-weight:500;
+    transition:color .15s ease;
+  }
+  .nav-links a:hover{color:var(--text);}
+  .nav-cta{display:flex; align-items:center; gap:14px;}
+  .nav-toggle{
+    display:none; background:none; border:1px solid var(--line); border-radius:8px;
+    width:42px; height:42px; color:var(--text); cursor:pointer;
+    align-items:center; justify-content:center;
+  }
+  @media (max-width:860px){
+    .nav-links{
+      position:absolute; top:100%; left:0; right:0;
+      flex-direction:column; align-items:flex-start; gap:0;
+      background:var(--panel); border-bottom:1px solid var(--line);
+      max-height:0; overflow:hidden; transition:max-height .25s ease;
+    }
+    .nav-links.open{max-height:320px;}
+    .nav-links li{width:100%;}
+    .nav-links a{display:block; padding:16px 20px; width:100%; border-bottom:1px solid var(--line);}
+    .nav-toggle{display:flex;}
+    .nav-cta .btn-ghost{display:none;}
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    padding:76px 0 90px;
+    background:
+      radial-gradient(700px 420px at 82% -10%, rgba(232,135,61,0.10), transparent 60%),
+      var(--bg);
+  }
+  .hero-grid{
+    display:grid; grid-template-columns:1.05fr 0.95fr; gap:56px; align-items:center;
+  }
+  @media (max-width:960px){
+    .hero-grid{grid-template-columns:1fr; gap:44px;}
+  }
+  .hero h1{
+    font-size:clamp(2.4rem, 4.6vw, 3.6rem);
+    line-height:1.03;
+    max-width:15ch;
+  }
+  .hero p.lead{
+    margin:22px 0 0; color:var(--text-dim); font-size:1.12rem; max-width:46ch;
+  }
+  .hero-ctas{display:flex; gap:14px; margin-top:32px; flex-wrap:wrap;}
+  .hero-trust{
+    display:flex; gap:26px; margin-top:38px; flex-wrap:wrap;
+  }
+  .hero-trust div{display:flex; align-items:center; gap:9px; color:var(--text-faint); font-size:0.87rem;}
+  .hero-trust svg{width:16px; height:16px; flex-shrink:0; color:var(--amber);}
+
+  /* ---------- PRODUCT PANEL (hero visual) ---------- */
+  .panel-frame{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-panel);
+    padding:16px; position:relative; overflow:hidden;
+  }
+  .panel-map{
+    position:relative; border-radius:10px; overflow:hidden;
+    background:#141920; height:290px;
+  }
+  .panel-map svg{width:100%; height:100%;}
+  .geo-fence{
+    fill:rgba(124,138,92,0.14); stroke:var(--olive); stroke-width:1.6; stroke-dasharray:5 5;
+  }
+  .route-line{
+    fill:none; stroke:var(--amber); stroke-width:2.6; stroke-linecap:round;
+    stroke-dasharray:340; stroke-dashoffset:340;
+    animation:draw 2.4s ease forwards .3s;
+  }
+  @keyframes draw{to{stroke-dashoffset:0;}}
+  .live-dot{
+    fill:var(--cyan);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  .live-ring{
+    fill:none; stroke:var(--cyan); stroke-width:1.4; opacity:0.55;
+    animation:ring 2s ease-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.6;}}
+  @keyframes ring{0%{r:6; opacity:0.6;} 100%{r:20; opacity:0;}}
+
+  .status-card{
+    position:absolute; left:14px; bottom:14px;
+    background:rgba(16,20,26,0.92); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; backdrop-filter:blur(6px);
+    display:flex; flex-direction:column; gap:6px; min-width:190px;
+  }
+  .status-row{display:flex; align-items:center; justify-content:space-between; gap:16px;}
+  .status-label{color:var(--text-faint); font-size:0.76rem;}
+  .status-val{font-family:'JetBrains Mono', monospace; font-size:0.82rem; color:var(--text);}
+  .status-online{display:flex; align-items:center; gap:6px; color:var(--cyan); font-size:0.78rem; font-weight:600;}
+  .status-online .dot{width:7px; height:7px; border-radius:50%; background:var(--cyan); animation:pulse 2s ease-in-out infinite;}
+
+  .panel-meta{display:flex; justify-content:space-between; align-items:center; padding:14px 6px 4px; gap:10px; flex-wrap:wrap;}
+  .device-chip{
+    display:flex; align-items:center; gap:8px; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:var(--radius-chip); padding:7px 12px; font-size:0.82rem; color:var(--text-dim);
+  }
+  .device-chip svg{width:14px; height:14px; color:var(--amber);}
+
+  /* ---------- SECTORS ---------- */
+  .sectors{padding:88px 0; border-top:1px solid var(--line);}
+  .section-head{max-width:640px; margin-bottom:44px;}
+  .section-head h2{font-size:clamp(1.9rem, 3.4vw, 2.5rem); line-height:1.06;}
+  .section-head p{color:var(--text-dim); margin-top:14px; font-size:1.04rem;}
+
+  .tabs{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:36px;}
+  .tab-btn{
+    background:var(--panel); border:1px solid var(--line); color:var(--text-dim);
+    padding:11px 20px; border-radius:999px; font-size:0.92rem; font-weight:600;
+    cursor:pointer; transition:all .15s ease; font-family:'Inter';
+  }
+  .tab-btn:hover{border-color:var(--text-faint); color:var(--text);}
+  .tab-btn.active{background:var(--amber); border-color:var(--amber); color:#171203;}
+
+  .tab-panel{
+    display:none; grid-template-columns:1fr 1fr; gap:48px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-panel);
+    padding:40px;
+  }
+  .tab-panel.active{display:grid;}
+  @media (max-width:800px){
+    .tab-panel{grid-template-columns:1fr; padding:28px;}
+  }
+  .tab-panel h3{font-size:1.7rem; margin-bottom:14px;}
+  .tab-panel p{color:var(--text-dim); font-size:1rem; margin-bottom:20px;}
+  .tab-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px;}
+  .tab-list li{display:flex; gap:10px; align-items:flex-start; color:var(--text); font-size:0.95rem;}
+  .tab-list svg{width:17px; height:17px; flex-shrink:0; margin-top:2px; color:var(--cyan);}
+  .tab-visual{
+    background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:24px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .tab-visual .stat{display:flex; justify-content:space-between; align-items:baseline; padding-bottom:12px; border-bottom:1px solid var(--line);}
+  .tab-visual .stat:last-child{border-bottom:none; padding-bottom:0;}
+  .tab-visual .stat-num{font-family:'Big Shoulders Display'; font-weight:800; font-size:1.9rem; color:var(--amber);}
+  .tab-visual .stat-label{color:var(--text-faint); font-size:0.85rem; text-align:right; max-width:16ch;}
+
+  /* ---------- HOW IT WORKS ---------- */
+  .how{padding:88px 0; border-top:1px solid var(--line); background:var(--panel);}
+  .steps{display:grid; grid-template-columns:repeat(4,1fr); gap:24px; margin-top:8px;}
+  @media (max-width:900px){.steps{grid-template-columns:1fr 1fr;}}
+  @media (max-width:560px){.steps{grid-template-columns:1fr;}}
+  .step{position:relative; padding-top:20px;}
+  .step-num{
+    font-family:'Big Shoulders Display'; font-weight:900; font-size:2.6rem;
+    color:transparent; -webkit-text-stroke:1.4px var(--line);
+    line-height:1; margin-bottom:14px;
+  }
+  .step h3{font-size:1.2rem; margin-bottom:8px; font-family:'Inter'; font-weight:700;}
+  .step p{color:var(--text-dim); font-size:0.93rem; margin:0;}
+
+  /* ---------- FEATURES (product panel style) ---------- */
+  .features{padding:88px 0; border-top:1px solid var(--line);}
+  .feat-grid{
+    display:grid; grid-template-columns:1.2fr 1fr; gap:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-panel);
+    overflow:hidden;
+  }
+  @media (max-width:860px){.feat-grid{grid-template-columns:1fr;}}
+  .feat-main{padding:44px; border-right:1px solid var(--line);}
+  @media (max-width:860px){.feat-main{border-right:none; border-bottom:1px solid var(--line);}}
+  .feat-row{
+    display:flex; gap:18px; padding:22px 0; border-bottom:1px solid var(--line);
+  }
+  .feat-row:last-child{border-bottom:none; padding-bottom:0;}
+  .feat-row:first-child{padding-top:0;}
+  .feat-icon{
+    width:42px; height:42px; flex-shrink:0; border-radius:9px;
+    background:var(--panel-2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .feat-icon svg{width:20px; height:20px; color:var(--amber);}
+  .feat-row h3{font-size:1.08rem; font-family:'Inter'; font-weight:700; margin-bottom:5px;}
+  .feat-row p{color:var(--text-dim); font-size:0.92rem; margin:0;}
+  .feat-side{background:var(--panel-2); padding:44px; display:flex; flex-direction:column; gap:22px;}
+  .feat-alert{
+    background:var(--bg); border:1px solid var(--danger); border-left-width:3px;
+    border-radius:8px; padding:14px 16px;
+  }
+  .feat-alert-title{display:flex; align-items:center; gap:8px; color:var(--danger); font-size:0.85rem; font-weight:700; margin-bottom:4px;}
+  .feat-alert-title svg{width:15px; height:15px;}
+  .feat-alert p{margin:0; color:var(--text-dim); font-size:0.88rem;}
+  .feat-side h4{font-family:'Inter'; font-weight:700; font-size:0.95rem; color:var(--text-dim); margin:0 0 4px;}
+  .device-list{display:flex; flex-direction:column; gap:10px;}
+  .device-item{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:11px 14px;
+  }
+  .device-item span{font-size:0.88rem;}
+  .device-item .dot{width:7px; height:7px; border-radius:50%; margin-right:8px; display:inline-block;}
+  .dot-cyan{background:var(--cyan);}
+  .dot-faint{background:var(--text-faint);}
+
+  /* ---------- PRICING ---------- */
+  .pricing{padding:88px 0; border-top:1px solid var(--line); background:var(--panel);}
+  .price-card{
+    max-width:520px; margin:0 auto;
+    background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-panel);
+    padding:40px;
+  }
+  .price-row{display:flex; justify-content:space-between; align-items:baseline; padding:18px 0; border-bottom:1px solid var(--line);}
+  .price-row:last-of-type{border-bottom:none;}
+  .price-row-label{font-size:1rem; color:var(--text);}
+  .price-row-sub{display:block; color:var(--text-faint); font-size:0.83rem; margin-top:3px;}
+  .price-num{font-family:'Big Shoulders Display'; font-weight:800; font-size:2.1rem; color:var(--amber); white-space:nowrap;}
+  .price-includes{list-style:none; margin:26px 0 0; padding:0; display:flex; flex-direction:column; gap:11px;}
+  .price-includes li{display:flex; gap:10px; font-size:0.93rem; color:var(--text-dim);}
+  .price-includes svg{width:16px; height:16px; color:var(--cyan); flex-shrink:0; margin-top:2px;}
+  .price-card .btn{width:100%; margin-top:28px;}
+  .price-note{text-align:center; color:var(--text-faint); font-size:0.85rem; margin-top:16px;}
+
+  /* ---------- LEAD FORM ---------- */
+  .lead{padding:88px 0; border-top:1px solid var(--line);}
+  .lead-grid{display:grid; grid-template-columns:0.9fr 1.1fr; gap:56px; align-items:start;}
+  @media (max-width:900px){.lead-grid{grid-template-columns:1fr; gap:36px;}}
+  .lead h2{font-size:clamp(1.9rem,3.4vw,2.4rem); line-height:1.08;}
+  .lead p.lead-copy{color:var(--text-dim); margin-top:16px; max-width:42ch;}
+  .lead-points{list-style:none; margin:28px 0 0; padding:0; display:flex; flex-direction:column; gap:14px;}
+  .lead-points li{display:flex; gap:10px; color:var(--text); font-size:0.95rem;}
+  .lead-points svg{width:17px; height:17px; color:var(--amber); flex-shrink:0; margin-top:2px;}
+
+  form{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-panel); padding:32px;}
+  .field{margin-bottom:18px;}
+  .field label{display:block; font-size:0.85rem; color:var(--text-dim); margin-bottom:7px; font-weight:500;}
+  .field input, .field select, .field textarea{
+    width:100%; background:var(--bg); border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; color:var(--text); font-family:'Inter'; font-size:0.95rem;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--amber);}
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:520px){.field-row{grid-template-columns:1fr;}}
+  form .btn{width:100%; margin-top:6px;}
+  .form-note{color:var(--text-faint); font-size:0.8rem; margin-top:14px; text-align:center;}
+  #form-status{margin-top:14px; font-size:0.9rem; display:none;}
+  #form-status.ok{color:var(--cyan); display:block;}
+  #form-status.err{color:var(--danger); display:block;}
+
+  /* ---------- FOOTER ---------- */
+  footer{padding:44px 0; border-top:1px solid var(--line);}
+  .footer-grid{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;}
+  .footer-links{display:flex; gap:24px; list-style:none; margin:0; padding:0; flex-wrap:wrap;}
+  .footer-links a{color:var(--text-faint); text-decoration:none; font-size:0.86rem;}
+  .footer-links a:hover{color:var(--text-dim);}
+  .footer-copy{color:var(--text-faint); font-size:0.86rem;}
+
+  /* ---------- COOKIE BANNER ---------- */
+  #cookie-banner{
+    position:fixed; left:20px; right:20px; bottom:20px; z-index:100;
+    max-width:560px; margin:0 auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:20px 22px; display:none; gap:16px; flex-direction:column;
+    box-shadow:0 12px 40px rgba(0,0,0,0.4);
+  }
+  #cookie-banner p{margin:0; font-size:0.87rem; color:var(--text-dim);}
+  #cookie-banner .cookie-actions{display:flex; gap:10px; flex-wrap:wrap;}
+  #cookie-banner .btn{padding:10px 18px; font-size:0.86rem;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a href="#top" class="logo">
+        <svg class="logo-mark" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="38" r="24" fill="#E8873D"/><path d="M50 62 L50 90" stroke="#E8873D" stroke-width="12" stroke-linecap="round"/></svg>
+        Huella
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#sectores">Sectores</a></li>
+        <li><a href="#como-funciona">Cómo funciona</a></li>
+        <li><a href="#funciones">Funciones</a></li>
+        <li><a href="#precio">Precio</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="#contacto" class="btn btn-ghost">Contactar</a>
+        <button class="nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <h1>Sabe dónde está, siempre.</h1>
+        <p class="lead">Localiza vehículos, flotas y animales en tiempo real, con alertas si salen de la zona que tú decidas. Sin comprar el dispositivo: lo alquilas, lo usas, lo devuelves.</p>
+        <div class="hero-ctas">
+          <a href="#contacto" class="btn btn-primary" data-track="cta_hero_primary">Solicitar dispositivo</a>
+          <a href="#como-funciona" class="btn btn-ghost" data-track="cta_hero_secondary">Cómo funciona</a>
+        </div>
+        <div class="hero-trust">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Sin permanencia</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Depósito reembolsable</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Cobertura 4G nacional</div>
+        </div>
+      </div>
+
+      <div class="panel-frame">
+        <div class="panel-map">
+          <svg viewBox="0 0 400 290" preserveAspectRatio="none">
+            <polygon class="geo-fence" points="40,40 300,25 370,140 320,255 90,260 20,150"/>
+            <path class="route-line" d="M60,220 C110,190 130,120 190,110 C250,100 260,60 330,50"/>
+            <circle class="live-ring" cx="330" cy="50" r="6"/>
+            <circle class="live-dot" cx="330" cy="50" r="6"/>
+          </svg>
+          <div class="status-card">
+            <div class="status-online"><span class="dot"></span>En línea</div>
+            <div class="status-row"><span class="status-label">Lat / Lon</span><span class="status-val" id="hero-coords">41.1968, -3.5742</span></div>
+            <div class="status-row"><span class="status-label">Velocidad</span><span class="status-val">42 km/h</span></div>
+            <div class="status-row"><span class="status-label">Batería</span><span class="status-val">86%</span></div>
+          </div>
+        </div>
+        <div class="panel-meta">
+          <div class="device-chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="7" rx="1"/><path d="M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3"/></svg>
+            Furgoneta 04 — Reparto Centro
+          </div>
+          <div class="device-chip">Actualizado hace 6s</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTORES -->
+  <section class="sectors" id="sectores">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Un mismo sistema, cuatro formas de usarlo</h2>
+        <p>La app se adapta a lo que estés localizando. Elige tu caso.</p>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" data-tab="taxis" role="tab" aria-selected="true">Taxis</button>
+        <button class="tab-btn" data-tab="reparto" role="tab" aria-selected="false">Furgonetas de reparto</button>
+        <button class="tab-btn" data-tab="alquiler" role="tab" aria-selected="false">Alquiler de vehículos</button>
+        <button class="tab-btn" data-tab="ganado" role="tab" aria-selected="false">Ganado y mascotas</button>
+      </div>
+
+      <div class="tab-panel active" data-panel="taxis">
+        <div>
+          <h3>Control de rutas y kilometraje</h3>
+          <p>Registra cada trayecto para justificar gastos ante Hacienda y ten un historial completo de tu actividad diaria.</p>
+          <ul class="tab-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Historial de rutas exportable</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Distancia recorrida por día o mes</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Alerta de seguridad si el vehículo se desvía de zonas habituales</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="stat"><span class="stat-num">312 km</span><span class="stat-label">recorridos esta semana</span></div>
+          <div class="stat"><span class="stat-num">18</span><span class="stat-label">trayectos registrados hoy</span></div>
+          <div class="stat"><span class="stat-num">1</span><span class="stat-label">vehículo bajo seguimiento</span></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="reparto">
+        <div>
+          <h3>Visibilidad de toda la flota</h3>
+          <p>Ve dónde está cada furgoneta en tiempo real, detecta desvíos no autorizados y ten el dato de horas y kilómetros por conductor.</p>
+          <ul class="tab-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Mapa con toda la flota a la vez</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Alertas de geovalla por ruta asignada</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Cumple con el deber de informar al conductor (RGPD)</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="stat"><span class="stat-num">6</span><span class="stat-label">furgonetas activas ahora</span></div>
+          <div class="stat"><span class="stat-num">2</span><span class="stat-label">alertas de zona hoy</span></div>
+          <div class="stat"><span class="stat-num">1.240 km</span><span class="stat-label">recorridos por la flota esta semana</span></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="alquiler">
+        <div>
+          <h3>Recupera lo tuyo, siempre</h3>
+          <p>Sabe en todo momento dónde está cada vehículo alquilado y recibe un aviso inmediato si no vuelve a la zona pactada.</p>
+          <ul class="tab-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Localización durante todo el alquiler</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Aviso si el vehículo sale de la zona de alquiler</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Historial de uso para resolver incidencias</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="stat"><span class="stat-num">14</span><span class="stat-label">vehículos en alquiler activo</span></div>
+          <div class="stat"><span class="stat-num">0</span><span class="stat-label">vehículos sin localizar</span></div>
+          <div class="stat"><span class="stat-num">4h</span><span class="stat-label">tiempo medio de recuperación ante incidencia</span></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="ganado">
+        <div>
+          <h3>Vigila el perímetro de la finca</h3>
+          <p>Dibuja el perímetro real de tu finca o parcela y recibe un aviso en el momento en que el animal lo cruce.</p>
+          <ul class="tab-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Geovalla con el polígono real de tu finca</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Batería pensada para exterior, días entre cargas</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Un solo dispositivo por animal, varios en la misma app</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="stat"><span class="stat-num">3</span><span class="stat-label">animales bajo seguimiento</span></div>
+          <div class="stat"><span class="stat-num">0</span><span class="stat-label">salidas de finca este mes</span></div>
+          <div class="stat"><span class="stat-num">4,2 ha</span><span class="stat-label">superficie vigilada</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMO FUNCIONA -->
+  <section class="how" id="como-funciona">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>De la caja al mapa en un día</h2>
+        <p>Sin instalación técnica, sin compra, sin permanencia.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <h3>Pagas el depósito</h3>
+          <p>Reembolsable al devolver el dispositivo en buen estado.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <h3>Recibes el GPS</h3>
+          <p>Ya viene configurado. Solo tienes que colocarlo en el vehículo o collar.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <h3>Abres la app</h3>
+          <p>Define tu zona segura y empieza a ver la posición en tiempo real.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">04</div>
+          <h3>Cancelas cuando quieras</h3>
+          <p>Devuelves el dispositivo y recuperas el depósito íntegro.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FUNCIONES -->
+  <section class="features" id="funciones">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Todo lo que necesitas para no perder la pista</h2>
+        <p>Una sola app para todos tus dispositivos, sea lo que sea que estés localizando.</p>
+      </div>
+      <div class="feat-grid">
+        <div class="feat-main">
+          <div class="feat-row">
+            <div class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+            <div>
+              <h3>Ubicación en tiempo real</h3>
+              <p>Posición actualizada con la frecuencia que necesites, desde el mapa de tu app.</p>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+            <div>
+              <h3>Alertas de geovalla</h3>
+              <p>Dibuja la zona que quieras vigilar y recibe un aviso al instante si el dispositivo la cruza.</p>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>
+            <div>
+              <h3>Distancia recorrida</h3>
+              <p>Informes por día, semana o mes para cada dispositivo, listos para exportar.</p>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></div>
+            <div>
+              <h3>Gestión de dispositivos</h3>
+              <p>Añade, renombra o pausa cada localizador desde una sola cuenta, sin límite de dispositivos.</p>
+            </div>
+          </div>
+        </div>
+        <div class="feat-side">
+          <div class="feat-alert">
+            <div class="feat-alert-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>Salida de zona</div>
+            <p>Furgoneta 04 ha salido de "Ruta Centro" — 09:42</p>
+          </div>
+          <div>
+            <h4>Dispositivos</h4>
+            <div class="device-list">
+              <div class="device-item"><span><span class="dot dot-cyan"></span>Furgoneta 04</span><span style="color:var(--text-faint); font-size:0.82rem;">86%</span></div>
+              <div class="device-item"><span><span class="dot dot-cyan"></span>Furgoneta 07</span><span style="color:var(--text-faint); font-size:0.82rem;">64%</span></div>
+              <div class="device-item"><span><span class="dot dot-faint"></span>Furgoneta 02</span><span style="color:var(--text-faint); font-size:0.82rem;">sin cobertura</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRECIO -->
+  <section class="pricing" id="precio">
+    <div class="wrap">
+      <div class="section-head" style="margin:0 auto 44px; text-align:center; max-width:540px;">
+        <h2>Un precio, sin sorpresas</h2>
+        <p>Sin permanencia. Cancela y devuelve el dispositivo cuando quieras.</p>
+      </div>
+      <div class="price-card">
+        <div class="price-row">
+          <div>
+            <div class="price-row-label">Depósito</div>
+            <span class="price-row-sub">Reembolsable al devolver el dispositivo</span>
+          </div>
+          <div class="price-num">50€</div>
+        </div>
+        <div class="price-row">
+          <div>
+            <div class="price-row-label">Cuota mensual</div>
+            <span class="price-row-sub">Incluye app, alertas y soporte</span>
+          </div>
+          <!-- TODO: fijar precio final de la cuota mensual antes de publicar -->
+          <div class="price-num">5€<span style="font-size:1rem; color:var(--text-faint);">/mes</span></div>
+        </div>
+        <ul class="price-includes">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Localizador GPS 4G, batería incluida</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>App con geovalla, historial y alertas</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Sin instalación técnica</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Soporte durante todo el alquiler</li>
+        </ul>
+        <a href="#contacto" class="btn btn-primary" data-track="cta_pricing">Solicitar dispositivo</a>
+        <p class="price-note">Sin tarjeta de crédito para empezar. Te contactamos para confirmar disponibilidad.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEAD FORM -->
+  <section class="lead" id="contacto">
+    <div class="wrap lead-grid">
+      <div>
+        <h2>Habla con nosotros</h2>
+        <p class="lead-copy">Cuéntanos qué necesitas localizar y te contactamos con disponibilidad y siguiente paso.</p>
+        <ul class="lead-points">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Respuesta en menos de 24h laborables</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Sin compromiso hasta que confirmes</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Envío a toda la Península</li>
+        </ul>
+      </div>
+
+      <form id="lead-form">
+        <div class="field">
+          <label for="f-name">Nombre</label>
+          <input type="text" id="f-name" name="name" required>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input type="email" id="f-email" name="email" required>
+          </div>
+          <div class="field">
+            <label for="f-phone">Teléfono</label>
+            <input type="tel" id="f-phone" name="phone">
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-sector">Sector</label>
+          <select id="f-sector" name="sector">
+            <option value="taxis">Taxi</option>
+            <option value="reparto">Furgonetas de reparto</option>
+            <option value="alquiler">Alquiler de vehículos</option>
+            <option value="ganado">Ganado y mascotas</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-qty">Nº de dispositivos que necesitas</label>
+          <input type="number" id="f-qty" name="quantity" min="1" value="1">
+        </div>
+        <div class="field">
+          <label for="f-msg">Mensaje (opcional)</label>
+          <textarea id="f-msg" name="message" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" data-track="cta_lead_submit">Enviar solicitud</button>
+        <div id="form-status" role="status"></div>
+        <p class="form-note">Al enviar aceptas nuestra <a href="#" style="color:var(--text-dim);">política de privacidad</a>.</p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap footer-grid">
+    <a href="#top" class="logo" style="font-size:1.1rem;">
+      <svg class="logo-mark" viewBox="0 0 100 100" fill="none" style="width:20px;height:20px;"><circle cx="50" cy="38" r="24" fill="#E8873D"/><path d="M50 62 L50 90" stroke="#E8873D" stroke-width="12" stroke-linecap="round"/></svg>
+      Huella
+    </a>
+    <ul class="footer-links">
+      <li><a href="#">Aviso legal</a></li>
+      <li><a href="#">Política de privacidad</a></li>
+      <li><a href="#">Política de cookies</a></li>
+      <li><a href="mailto:hola@huellagps.example">hola@huellagps.example</a></li>
+    </ul>
+    <span class="footer-copy">© 2026 Huella GPS</span>
+  </div>
+</footer>
+
+<!-- COOKIE CONSENT -->
+<div id="cookie-banner">
+  <p>Usamos cookies de analítica para entender cómo se usa la web. Puedes aceptarlas o rechazarlas; la web funciona igual en ambos casos.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-primary" id="cookie-accept">Aceptar</button>
+    <button class="btn btn-ghost" id="cookie-reject">Rechazar</button>
+  </div>
+</div>
+
+<script>
+  // ---------- Nav toggle (mobile) ----------
+  const navToggle = document.getElementById('nav-toggle');
+  const navLinks = document.getElementById('nav-links');
+  navToggle.addEventListener('click', () => {
+    const open = navLinks.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open);
+  });
+  navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    navLinks.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+  }));
+
+  // ---------- Sector tabs ----------
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+      tabPanels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
+      trackEvent('sector_tab_view', { sector: btn.dataset.tab });
+    });
+  });
+
+  // ---------- Fake live coordinate readout ----------
+  const coordsEl = document.getElementById('hero-coords');
+  let baseLat = 41.1968, baseLon = -3.5742;
+  setInterval(() => {
+    const lat = (baseLat + (Math.random() - 0.5) * 0.0006).toFixed(4);
+    const lon = (baseLon + (Math.random() - 0.5) * 0.0006).toFixed(4);
+    coordsEl.textContent = `${lat}, ${lon}`;
+  }, 2500);
+
+  // ---------- Lead form ----------
+  // TODO: sustituye esta URL por tu endpoint real (por ejemplo un endpoint
+  // nuevo en tu proyecto de Vercel, ej. https://the-horse-tracker-api.vercel.app/api/leads)
+  const LEAD_ENDPOINT = 'https://TU-DOMINIO-O-API.vercel.app/api/leads';
+
+  const form = document.getElementById('lead-form');
+  const status = document.getElementById('form-status');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    status.className = '';
+    status.textContent = 'Enviando...';
+    status.style.display = 'block';
+    try {
+      const res = await fetch(LEAD_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('bad status');
+      status.textContent = 'Solicitud enviada. Te contactamos en menos de 24h.';
+      status.className = 'ok';
+      form.reset();
+      trackEvent('lead_form_submit', { sector: data.sector });
+    } catch (err) {
+      status.textContent = 'No hemos podido enviarlo. Escríbenos directamente a hola@huellagps.example';
+      status.className = 'err';
+    }
+  });
+
+  // ---------- CTA click tracking ----------
+  document.querySelectorAll('[data-track]').forEach(el => {
+    el.addEventListener('click', () => trackEvent(el.dataset.track, {}));
+  });
+
+  function trackEvent(name, params) {
+    if (typeof gtag === 'function') gtag('event', name, params);
+  }
+
+  // ---------- Cookie consent + GA4 (gated) ----------
+  // TODO: sustituye G-XXXXXXXXXX por tu ID real de medición de GA4
+  const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX';
+
+  function loadGA() {
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function(){ dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID);
+  }
+
+  const banner = document.getElementById('cookie-banner');
+  const consent = localStorage.getItem('cookie-consent');
+  if (consent === 'accepted') {
+    loadGA();
+  } else if (consent === null) {
+    banner.style.display = 'flex';
+  }
+  document.getElementById('cookie-accept').addEventListener('click', () => {
+    localStorage.setItem('cookie-consent', 'accepted');
+    banner.style.display = 'none';
+    loadGA();
+  });
+  document.getElementById('cookie-reject').addEventListener('click', () => {
+    localStorage.setItem('cookie-consent', 'rejected');
+    banner.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>

@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' as ll;
 import '../api/api_client.dart';
 import '../models/device.dart';
 import '../models/location_point.dart';
+import '../theme/app_theme.dart';
 import '../utils/palette.dart';
 
 class _DeviceTrail {
@@ -107,11 +108,19 @@ class _AllDevicesMap extends StatelessWidget {
         for (final loc in trail.locations) ll.LatLng(loc.latitude, loc.longitude),
     ];
 
-    final mapOptions = allPoints.length > 1
+    // CameraFit.bounds computes an infinite zoom (and throws) when the
+    // bounds have zero area, e.g. every device's last location coincides.
+    // Treat that the same as a single point instead of fitting to a
+    // degenerate box.
+    final bounds = allPoints.length > 1 ? LatLngBounds.fromPoints(allPoints) : null;
+    final hasSpread = bounds != null && (bounds.north != bounds.south || bounds.east != bounds.west);
+
+    final mapOptions = hasSpread
         ? MapOptions(
             initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints(allPoints),
+              bounds: bounds,
               padding: const EdgeInsets.all(48),
+              maxZoom: 18,
             ),
           )
         : MapOptions(
@@ -124,9 +133,12 @@ class _AllDevicesMap extends StatelessWidget {
         FlutterMap(
           options: mapOptions,
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.the_horse_tracker_app',
+            ColorFiltered(
+              colorFilter: darkTileColorFilter,
+              child: TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.the_horse_tracker_app',
+              ),
             ),
             MarkerLayer(
               markers: [
@@ -152,7 +164,12 @@ class _AllDevicesMap extends StatelessWidget {
             ),
           ],
         ),
-        Positioned(left: 12, right: 12, bottom: 12, child: _DevicesLegend(trails: trails)),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: MediaQuery.paddingOf(context).bottom + 12,
+          child: _DevicesLegend(trails: trails),
+        ),
       ],
     );
   }

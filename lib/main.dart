@@ -4,6 +4,7 @@ import 'navigation.dart';
 import 'screens/device_list_screen.dart';
 import 'screens/login_screen.dart';
 import 'session/session_store.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(const HorseTrackerApp());
@@ -17,10 +18,8 @@ class HorseTrackerApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Horse Tracker',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2d4a34)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
       home: const _StartupGate(),
     );
   }
