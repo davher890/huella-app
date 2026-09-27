@@ -14,6 +14,11 @@
 
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2238%22 r=%2222%22 fill=%22%23E8873D%22/><path d=%22M50 60 L50 90%22 stroke=%22%23E8873D%22 stroke-width=%2214%22 stroke-linecap=%22round%22/></svg>">
 
+<!-- Google Tag Manager: dataLayer is initialized unconditionally so early
+     trackEvent() calls queue up harmlessly; the actual GTM container script
+     only loads after cookie consent (see the bottom script block). -->
+<script>window.dataLayer = window.dataLayer || [];</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -360,6 +365,13 @@
 </style>
 </head>
 <body>
+<!-- Google Tag Manager (noscript) -->
+<!-- This iframe always renders for no-JS visitors; it cannot be gated
+     behind the cookie consent choice below since that logic requires
+     JavaScript. -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NN4MCZ9M"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
 
 <header>
   <div class="wrap">
@@ -703,7 +715,7 @@
       <li><a href="#">Aviso legal</a></li>
       <li><a href="#">Política de privacidad</a></li>
       <li><a href="#">Política de cookies</a></li>
-      <li><a href="mailto:hola@huellagps.example">hola@huellagps.example</a></li>
+      <li><a href="mailto:davher890@gmail.com">davher890@gmail.com</a></li>
     </ul>
     <span class="footer-copy">© 2026 Huella GPS</span>
   </div>
@@ -755,22 +767,27 @@
   }, 2500);
 
   // ---------- Lead form ----------
-  // TODO: sustituye esta URL por tu endpoint real (por ejemplo un endpoint
-  // nuevo en tu proyecto de Vercel, ej. https://the-horse-tracker-api.vercel.app/api/leads)
-  const LEAD_ENDPOINT = 'https://TU-DOMINIO-O-API.vercel.app/api/leads';
+  // Sends straight to FormSubmit.co (https://formsubmit.co), a free
+  // form-to-email relay: no backend needed. IMPORTANT: the first submission
+  // to a new destination address triggers a one-time confirmation email
+  // that must be clicked before further leads are delivered.
+  const LEAD_ENDPOINT = 'https://formsubmit.co/ajax/davher890@gmail.com';
 
   const form = document.getElementById('lead-form');
   const status = document.getElementById('form-status');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
+    data._subject = 'Nuevo lead - Huella GPS';
+    data._template = 'table';
+    data._captcha = 'false';
     status.className = '';
     status.textContent = 'Enviando...';
     status.style.display = 'block';
     try {
       const res = await fetch(LEAD_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error('bad status');
@@ -779,7 +796,7 @@
       form.reset();
       trackEvent('lead_form_submit', { sector: data.sector });
     } catch (err) {
-      status.textContent = 'No hemos podido enviarlo. Escríbenos directamente a hola@huellagps.example';
+      status.textContent = 'No hemos podido enviarlo. Escríbenos directamente a davher890@gmail.com';
       status.className = 'err';
     }
   });
@@ -789,36 +806,39 @@
     el.addEventListener('click', () => trackEvent(el.dataset.track, {}));
   });
 
+  // Pushes to the dataLayer so any GTM tag (GA4 config, Ads conversion,
+  // etc.) can pick it up via a Custom Event trigger — works even before
+  // the container script below has loaded, since dataLayer is just a queue.
   function trackEvent(name, params) {
-    if (typeof gtag === 'function') gtag('event', name, params);
+    window.dataLayer.push({ event: name, ...params });
   }
 
-  // ---------- Cookie consent + GA4 (gated) ----------
-  // TODO: sustituye G-XXXXXXXXXX por tu ID real de medición de GA4
-  const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX';
+  // ---------- Cookie consent + Google Tag Manager (gated) ----------
+  // GA4 itself isn't loaded directly here: add it as a "Google Analytics:
+  // GA4 Configuration" tag inside this GTM container (tagmanager.google.com),
+  // firing on the built-in "All Pages" trigger. That keeps a single source
+  // of truth instead of double-counting hits from two separate scripts.
+  const GTM_CONTAINER_ID = 'GTM-NN4MCZ9M';
 
-  function loadGA() {
+  function loadGTM() {
     const s = document.createElement('script');
     s.async = true;
-    s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    s.src = `https://www.googletagmanager.com/gtm.js?id=${GTM_CONTAINER_ID}`;
     document.head.appendChild(s);
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function(){ dataLayer.push(arguments); };
-    gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID);
+    window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
   }
 
   const banner = document.getElementById('cookie-banner');
   const consent = localStorage.getItem('cookie-consent');
   if (consent === 'accepted') {
-    loadGA();
+    loadGTM();
   } else if (consent === null) {
     banner.style.display = 'flex';
   }
   document.getElementById('cookie-accept').addEventListener('click', () => {
     localStorage.setItem('cookie-consent', 'accepted');
     banner.style.display = 'none';
-    loadGA();
+    loadGTM();
   });
   document.getElementById('cookie-reject').addEventListener('click', () => {
     localStorage.setItem('cookie-consent', 'rejected');

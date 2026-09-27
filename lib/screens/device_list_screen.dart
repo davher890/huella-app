@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../models/device.dart';
+import '../push/push_notifications.dart';
 import '../session/session_store.dart';
 import 'account_screen.dart';
 import 'admin/admin_screen.dart';
@@ -28,6 +29,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     SessionStore().isAdmin().then((isAdmin) {
       if (mounted) setState(() => _isAdmin = isAdmin);
     });
+    // Runs both right after a fresh login and on every app restart with a
+    // saved session, so the token registered with the backend never goes
+    // stale for long.
+    PushNotifications.initAndRegister();
   }
 
   Future<void> _refresh() async {
@@ -38,6 +43,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   }
 
   Future<void> _logout(BuildContext context) async {
+    await PushNotifications.unregister();
     await SessionStore().clear();
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(

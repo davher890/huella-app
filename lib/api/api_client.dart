@@ -249,13 +249,45 @@ class ApiClient {
         .toList();
   }
 
-  Future<void> saveGeofence(String deviceId, List<LatLng> points) async {
+  // Same as fetchGeofence, but also returns geometryType ('polygon' or
+  // 'circle') so the zone editor can reopen a saved circle in circle mode
+  // instead of only ever seeing its many-sided polygon approximation.
+  Future<({List<LatLng> points, String geometryType})?> fetchGeofenceDetails(String deviceId) async {
+    final res = await _send(() async => http.get(
+          Uri.parse('$apiBaseUrl/api/devices/$deviceId/geofence'),
+          headers: await _authHeaders(),
+        ));
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (res.statusCode != 200) {
+      throw ApiException(body['error'] as String? ?? 'No se pudo obtener la zona guardada');
+    }
+
+    final geofence = body['geofence'] as Map<String, dynamic>?;
+    if (geofence == null) return null;
+
+    final points = geofence['points'] as List<dynamic>? ?? [];
+    return (
+      points: points
+          .map((p) => LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble()))
+          .toList(),
+      geometryType: geofence['geometryType'] as String? ?? 'polygon',
+    );
+  }
+
+  Future<void> saveGeofence(
+    String deviceId,
+    List<LatLng> points, {
+    String geometryType = 'polygon',
+  }) async {
     final headers = await _authHeaders();
     final res = await _send(() => http.post(
           Uri.parse('$apiBaseUrl/api/devices/$deviceId/geofence'),
           headers: {...headers, 'Content-Type': 'application/json'},
           body: jsonEncode({
             'points': points.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+            'geometryType': geometryType,
           }),
         ));
 
@@ -357,6 +389,34 @@ class ApiClient {
     if (res.statusCode != 201) {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       throw ApiException(body['error'] as String? ?? 'No se pudo crear el device');
+    }
+  }
+
+  Future<void> registerPushToken(String fcmToken, {required String platform}) async {
+    final headers = await _authHeaders();
+    final res = await _send(() => http.post(
+          Uri.parse('$apiBaseUrl/api/push-tokens'),
+          headers: {...headers, 'Content-Type': 'application/json'},
+          body: jsonEncode({'fcmToken': fcmToken, 'platform': platform}),
+        ));
+
+    if (res.statusCode != 201) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiException(body['error'] as String? ?? 'No se pudo registrar el token de notificaciones');
+    }
+  }
+
+  Future<void> unregisterPushToken(String fcmToken) async {
+    final headers = await _authHeaders();
+    final res = await _send(() => http.delete(
+          Uri.parse('$apiBaseUrl/api/push-tokens'),
+          headers: {...headers, 'Content-Type': 'application/json'},
+          body: jsonEncode({'fcmToken': fcmToken}),
+        ));
+
+    if (res.statusCode != 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiException(body['error'] as String? ?? 'No se pudo eliminar el token de notificaciones');
     }
   }
 }
