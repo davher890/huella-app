@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
@@ -17,6 +18,10 @@ class PushNotifications {
   static bool _listenersAttached = false;
 
   static Future<void> initAndRegister() async {
+    // Push notifications are Android-only for now: there's no Firebase Web
+    // app registered, so Firebase was never initialized on web (see main.dart).
+    if (kIsWeb) return;
+
     final settings = await FirebaseMessaging.instance.requestPermission();
     debugPrint('PushNotifications: permission status = ${settings.authorizationStatus}');
     if (settings.authorizationStatus == AuthorizationStatus.denied) return;
@@ -65,6 +70,7 @@ class PushNotifications {
   }
 
   static Future<void> unregister() async {
+    if (kIsWeb) return;
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) await ApiClient().unregisterPushToken(token);
