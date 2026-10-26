@@ -91,22 +91,14 @@ In production this build is served from `the-horse-tracker-api`'s Vercel
 deployment, under `/app` (e.g. `https://huellagps.es/app`), not from its own
 hosting. That means:
 
-1. Build with `--base-href /app/` — without it, the generated `index.html`
-   requests its assets from `/`, which 404s once served from a subpath:
+1. Build and copy the output into the API repo's `public/app/`, replacing
+   what's there (assumes both repos are checked out as sibling directories):
 
    ```bash
-   flutter build web --base-href /app/
+   ./scripts/deploy_web.sh
    ```
 
-2. Copy the output into the API repo's `public/app/`, replacing what's there:
-
-   ```bash
-   rm -rf ../the-horse-tracker-api/public/app
-   mkdir -p ../the-horse-tracker-api/public/app
-   cp -r build/web/* ../the-horse-tracker-api/public/app/
-   ```
-
-3. Commit and push that from the `the-horse-tracker-api` repo to deploy it
+2. Commit and push that from the `the-horse-tracker-api` repo to deploy it
    (see that repo's README).
 
 ## Debugging
