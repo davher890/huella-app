@@ -26,7 +26,7 @@ class HorseTrackerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Tracking things',
+      title: 'Huella GPS',
       theme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       home: const _StartupGate(),
