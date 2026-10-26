@@ -8,6 +8,7 @@ import '../api/api_client.dart';
 import '../models/device.dart';
 import '../models/location_point.dart';
 import '../models/time_range_filter.dart';
+import '../session/session_store.dart';
 import '../theme/app_theme.dart';
 import '../utils/palette.dart';
 import 'create_zone_screen.dart';
@@ -42,6 +43,8 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
   bool _wasRealtimeBeforeClusters = false;
   Future<List<LocationPoint>>? _clustersFuture;
 
+  bool _isAdmin = false;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +53,9 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
     _fetchLatest();
     _realtimeTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLatest());
     _loadZone();
+    SessionStore().isAdmin().then((isAdmin) {
+      if (mounted) setState(() => _isAdmin = isAdmin);
+    });
   }
 
   Future<void> _loadZone() async {
@@ -319,11 +325,12 @@ class _DeviceLocationsScreenState extends State<DeviceLocationsScreen> {
             tooltip: 'Crear zona',
             onPressed: _openCreateZone,
           ),
-          IconButton(
-            icon: Icon(_isClusters ? Icons.blur_circular : Icons.blur_circular_outlined),
-            tooltip: _isClusters ? 'Ocultar zonas calculadas' : 'Ver zonas calculadas',
-            onPressed: _toggleClusters,
-          ),
+          if (_isAdmin)
+            IconButton(
+              icon: Icon(_isClusters ? Icons.blur_circular : Icons.blur_circular_outlined),
+              tooltip: _isClusters ? 'Ocultar zonas calculadas' : 'Ver zonas calculadas',
+              onPressed: _toggleClusters,
+            ),
           if (!_isClusters) ...[
             IconButton(
               icon: Icon(_isRealtime ? Icons.podcasts : Icons.filter_alt_outlined),
@@ -605,7 +612,10 @@ class _LocationsList extends StatelessWidget {
           leading: const Icon(Icons.location_on_outlined),
           title: Text('${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}'),
           subtitle: Text(loc.recordedAt?.toLocal().toString() ?? 'sin fecha'),
-          trailing: loc.speed != null ? Text('${loc.speed!.toStringAsFixed(1)} m/s') : null,
+          // speed is stored in km/h: that's the native unit real hardware
+          // trackers (e.g. Sinotrack, following the JT/T808 protocol) report
+          // it in, so it's treated as the canonical unit end to end.
+          trailing: loc.speed != null ? Text('${loc.speed!.toStringAsFixed(1)} km/h') : null,
         );
       },
     );
@@ -752,11 +762,13 @@ class _RouteMap extends StatelessWidget {
   }
 
   void _showPointInfo(BuildContext context, LocationPoint point) {
+    // speed is stored in km/h (see the note in _LocationsList).
+    final speedText = point.speed != null ? '  ${point.speed!.toStringAsFixed(1)} km/h' : '';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           '${point.recordedAt?.toLocal() ?? 'sin fecha'}  '
-          '(${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})',
+          '(${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})$speedText',
         ),
         duration: const Duration(seconds: 2),
       ),

@@ -635,8 +635,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <div class="price-row-label">Cuota mensual</div>
             <span class="price-row-sub">Incluye app, alertas y soporte</span>
           </div>
-          <!-- TODO: fijar precio final de la cuota mensual antes de publicar -->
-          <div class="price-num">5€<span style="font-size:1rem; color:var(--text-faint);">/mes</span></div>
+          <div class="price-num">12€<span style="font-size:1rem; color:var(--text-faint);">/mes</span></div>
         </div>
         <ul class="price-includes">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Localizador GPS 4G, batería incluida</li>
@@ -645,7 +644,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Soporte durante todo el alquiler</li>
         </ul>
         <a href="#contacto" class="btn btn-primary" data-track="cta_pricing">Solicitar dispositivo</a>
-        <p class="price-note">Sin tarjeta de crédito para empezar. Te contactamos para confirmar disponibilidad.</p>
+        <p class="price-note">120€/año con el plan anual (2 meses gratis). A partir de 20 vehículos, 10€/mes (100€/año). Sin tarjeta de crédito para empezar.</p>
       </div>
     </div>
   </section>
@@ -715,7 +714,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <li><a href="#">Aviso legal</a></li>
       <li><a href="#">Política de privacidad</a></li>
       <li><a href="#">Política de cookies</a></li>
-      <li><a href="mailto:davher890@gmail.com">davher890@gmail.com</a></li>
+      <li><a href="mailto:huellagps@gmail.com">huellagps@gmail.com</a></li>
     </ul>
     <span class="footer-copy">© 2026 Huella GPS</span>
   </div>
@@ -771,7 +770,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   // form-to-email relay: no backend needed. IMPORTANT: the first submission
   // to a new destination address triggers a one-time confirmation email
   // that must be clicked before further leads are delivered.
-  const LEAD_ENDPOINT = 'https://formsubmit.co/ajax/davher890@gmail.com';
+  const LEAD_ENDPOINT = 'https://formsubmit.co/ajax/huellagps@gmail.com';
 
   const form = document.getElementById('lead-form');
   const status = document.getElementById('form-status');
@@ -796,7 +795,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       form.reset();
       trackEvent('lead_form_submit', { sector: data.sector });
     } catch (err) {
-      status.textContent = 'No hemos podido enviarlo. Escríbenos directamente a davher890@gmail.com';
+      status.textContent = 'No hemos podido enviarlo. Escríbenos directamente a huellagps@gmail.com';
       status.className = 'err';
     }
   });
